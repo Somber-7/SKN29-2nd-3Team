@@ -55,6 +55,7 @@ from typing import Optional, Iterable
 import joblib
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.inspection import permutation_importance as sklearn_permutation_importance
@@ -582,7 +583,7 @@ def compare_regression_models(
     """
     rows: list[dict] = []
 
-    for model in models:
+    for model in tqdm(models):
         try:
             metrics = model.fit_from_dataframe(df)
             row = {"model": model.name, **metrics, "error": None}

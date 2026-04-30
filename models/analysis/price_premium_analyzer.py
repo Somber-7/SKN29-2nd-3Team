@@ -11,14 +11,14 @@ models/analysis/price_premium_analyzer.py
 사용 예시
 ---------
 import pandas as pd
-from models.regression.price_regression_models import LightGBMPriceModel
+from models.regression.price_regression_models import XGBoostPriceModel
 from models.analysis.price_premium_analyzer import PricePremiumAnalyzer
 
 # 1. 데이터 로드
 df = pd.read_csv("Apart Deal_6.csv", encoding="cp949")
 
 # 2. 기준 가격 예측 모델 학습
-price_model = LightGBMPriceModel(sample_size=100_000, random_state=42)
+price_model = XGBoostPriceModel(sample_size=100_000, random_state=42)
 price_model.fit_from_dataframe(df)
 
 # 3. 프리미엄 분석
@@ -372,13 +372,13 @@ if __name__ == "__main__":
     import pandas as pd
 
     try:
-        from models.regression.price_regression_models import LightGBMPriceModel
+        from models.regression.price_regression_models import XGBoostPriceModel
     except ModuleNotFoundError:
-        from price_regression_models import LightGBMPriceModel
+        from price_regression_models import XGBoostPriceModel
 
     df = pd.read_csv("Apart Deal_6.csv", encoding="cp949")
 
-    price_model = LightGBMPriceModel(sample_size=100_000, random_state=42)
+    price_model = XGBoostPriceModel(sample_size=100_000, random_state=42)
     price_model.fit_from_dataframe(df)
 
     analyzer = PricePremiumAnalyzer(price_model=price_model)
