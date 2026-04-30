@@ -66,7 +66,7 @@ class KMeansLocationClusterModel(BaseClusterModel):
     전체 500만 건을 미니배치로 처리하여 메모리 효율적으로 학습합니다.
 
     파생 피처:
-        평당가   = 거래금액 / (전용면적 / 3.3)
+        평당가   = log1p(거래금액 / (전용면적 / 3.3))
         건물연식 = current_year - 건축년도
     """
 
@@ -78,6 +78,7 @@ class KMeansLocationClusterModel(BaseClusterModel):
         current_year: int = 2026,
         random_state: int = 42,
         feature_cols: Optional[list[str]] = None,
+        feature_weights: Optional[dict[str, float]] = None,
     ):
         super().__init__(name="KMeansLocationCluster(MiniBatch)")
         self.n_clusters   = n_clusters
@@ -87,8 +88,9 @@ class KMeansLocationClusterModel(BaseClusterModel):
         self.random_state = random_state
         self.feature_cols = feature_cols or [
             "위도", "경도", "평당가", "건물연식",
-            "인근학교수", "인근역수", "세대수",
         ]
+        # 위도/경도에 3배 가중치 — 지리 기반 군집을 더 선명하게
+        self.feature_weights = feature_weights or {"위도": 3.0, "경도": 3.0}
         self._scaler: Optional[StandardScaler] = None
         self.fitted_feature_index_: Optional[pd.Index] = None
         self.metrics_: Optional[dict] = None
@@ -120,7 +122,7 @@ class KMeansLocationClusterModel(BaseClusterModel):
                 data[col] = 0
             data[col] = self._clean_numeric(data[col])
 
-        data["평당가"]   = data["거래금액"] / (data["전용면적"] / 3.3)
+        data["평당가"]   = np.log1p(data["거래금액"] / (data["전용면적"] / 3.3))
         data["건물연식"] = self.current_year - data["건축년도"]
 
         data = data.replace([np.inf, -np.inf], np.nan)
@@ -136,14 +138,25 @@ class KMeansLocationClusterModel(BaseClusterModel):
             X[col] = self._clean_numeric(X[col])
         return X.replace([np.inf, -np.inf], np.nan).dropna(subset=self.feature_cols)
 
+    def _apply_weights(self, X_scaled: np.ndarray, col_names: list[str]) -> np.ndarray:
+        """StandardScaler 후 피처별 가중치를 곱합니다."""
+        result = X_scaled.copy()
+        for col, w in self.feature_weights.items():
+            if col in col_names:
+                result[:, col_names.index(col)] *= w
+        return result
+
     def fit(self, X: pd.DataFrame) -> "KMeansLocationClusterModel":
         """피처 DataFrame으로 MiniBatchKMeans를 학습합니다."""
         X_feat = self._prepare_features(X)
 
         self._scaler = StandardScaler()
-        X_scaled = self._scaler.fit_transform(X_feat)
+        X_scaled = self._apply_weights(
+            self._scaler.fit_transform(X_feat),
+            list(X_feat.columns),
+        )
 
-        print(f"[{self.name}] 학습 시작 — n={len(X_scaled):,}, k={self.n_clusters}, batch={self.batch_size:,}")
+        print(f"[{self.name}] 학습 시작 — n={len(X_scaled):,}, k={self.n_clusters}, batch={self.batch_size:,}, weights={self.feature_weights}")
 
         self._model = MiniBatchKMeans(
             n_clusters=self.n_clusters,
@@ -171,14 +184,14 @@ class KMeansLocationClusterModel(BaseClusterModel):
             raise RuntimeError(f"[{self.name}] fit()을 먼저 호출하세요.")
 
         X_feat   = self._prepare_features(X)
-        X_scaled = self._scaler.transform(X_feat)
+        X_scaled = self._apply_weights(self._scaler.transform(X_feat), list(X_feat.columns))
         return self._model.predict(X_scaled)
 
     def evaluate(self, X: pd.DataFrame) -> dict:
         if self._labels is None:
             raise RuntimeError(f"[{self.name}] fit()을 먼저 호출하세요.")
         X_feat   = self._prepare_features(X)
-        X_scaled = self._scaler.transform(X_feat)
+        X_scaled = self._apply_weights(self._scaler.transform(X_feat), list(X_feat.columns))
         if len(X_scaled) == len(self._labels):
             labels = self._labels
         else:
@@ -203,28 +216,32 @@ class KMeansLocationClusterModel(BaseClusterModel):
         data = data.dropna(subset=[label_col])
         data[label_col] = data[label_col].astype(int)
 
+        # 요약용 평당가는 원래 단위로 (log 역변환)
+        data["평당가_원단위"] = np.expm1(data["평당가"])
+
         summary = data.groupby(label_col).agg(
-            거래건수      =("거래금액",   "count"),
-            평균거래금액  =("거래금액",   "mean"),
-            중앙거래금액  =("거래금액",   "median"),
-            평균평당가    =("평당가",     "mean"),
-            중앙평당가    =("평당가",     "median"),
-            평균전용면적  =("전용면적",   "mean"),
-            평균건물연식  =("건물연식",   "mean"),
-            평균인근학교수=("인근학교수", "mean"),
-            평균인근역수  =("인근역수",   "mean"),
-            평균세대수    =("세대수",     "mean"),
-            중심위도      =("위도",       "mean"),
-            중심경도      =("경도",       "mean"),
+            거래건수      =("거래금액",      "count"),
+            평균거래금액  =("거래금액",      "mean"),
+            중앙거래금액  =("거래금액",      "median"),
+            평균평당가    =("평당가_원단위", "mean"),
+            중앙평당가    =("평당가_원단위", "median"),
+            평균전용면적  =("전용면적",      "mean"),
+            평균건물연식  =("건물연식",      "mean"),
+            평균인근학교수=("인근학교수",    "mean"),
+            평균인근역수  =("인근역수",      "mean"),
+            평균세대수    =("세대수",        "mean"),
+            중심위도      =("위도",          "mean"),
+            중심경도      =("경도",          "mean"),
         )
         return summary.reset_index().sort_values("거래건수", ascending=False)
 
     def get_params(self) -> dict:
         return {
-            "n_clusters":   self.n_clusters,
-            "max_iter":     self.max_iter,
-            "batch_size":   self.batch_size,
-            "feature_cols": self.feature_cols,
+            "n_clusters":      self.n_clusters,
+            "max_iter":        self.max_iter,
+            "batch_size":      self.batch_size,
+            "feature_cols":    self.feature_cols,
+            "feature_weights": self.feature_weights,
         }
 
     def save(self, path: str) -> None:
