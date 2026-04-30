@@ -29,6 +29,11 @@ def render_sidebar():
         st.page_link("pages/1_가격추이분석.py", label="📈  가격 추이 분석")
         st.page_link("pages/2_입지분석.py",     label="📍  입지 분석")
         st.page_link("pages/3_지도시각화.py",   label="🗺️  지도 시각화")
+        st.page_link("pages/4_회귀모델.py",     label="📊  회귀 모델")
+        st.page_link("pages/5_분류모델.py",     label="🏷️  분류 모델")
+        st.page_link("pages/6_군집화.py",       label="🔵  군집화")
+        st.page_link("pages/7_신경망.py",       label="🧠  신경망 (DNN)")
+        st.page_link("pages/8_모델비교.py",     label="📋  모델 비교")
 
 
 def page_header(title: str):

@@ -20,6 +20,12 @@ html, body, [class*="css"] {
     background-color: #F0F4F8;
 }
 
+/* 상단 흰 줄(헤더 툴바) — 앱 배경색과 통일 */
+[data-testid="stHeader"] {
+    background-color: #F0F4F8 !important;
+    border-bottom: 1px solid #E5EAF2;
+}
+
 /* 메인 콘텐츠 패딩 */
 [data-testid="stAppViewBlock"] > div {
     padding: 1.5rem 2rem;

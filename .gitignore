@@ -1,5 +1,4 @@
 .env
 *.csv
-
-trashbin/
 __pycache__
+.vscode
