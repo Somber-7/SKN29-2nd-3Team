@@ -8,6 +8,7 @@ numpy>=1.26.0
 # Machine Learning
 scikit-learn>=1.4.0
 lightgbm>=4.3.0
+xgboost>=2.0.0
 
 # Deep Learning
 torch>=2.3.0

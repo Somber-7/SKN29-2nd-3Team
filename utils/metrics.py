@@ -13,6 +13,9 @@ utils/metrics.py — 모델 평가지표 계산 유틸리티
     # 분류 (확률값 있을 때 ROC-AUC 자동 계산)
     metrics = classification_metrics(y_test, y_pred, y_prob=model.predict_proba(X_test))
 
+    # 불균형 분류 — Recall 중심 최적 threshold 탐색
+    best_threshold, best_f1 = find_best_threshold(y_test, y_prob[:, 1], metric="recall")
+
     # 군집화
     metrics = clustering_metrics(X, cluster_labels)
 """
@@ -28,6 +31,7 @@ from sklearn.metrics import (
     f1_score,
     roc_auc_score,
     confusion_matrix,
+    precision_recall_curve,
     silhouette_score,
     davies_bouldin_score,
     calinski_harabasz_score,
@@ -122,6 +126,56 @@ def classification_metrics(y_true, y_pred, y_prob=None, average="weighted") -> d
             # 클래스 수 불일치 등으로 계산 불가한 경우 무시
             pass
     return metrics
+
+
+def find_best_threshold(y_true, y_prob, metric: str = "f1", beta: float = 1.0) -> tuple[float, float]:
+    """Precision-Recall Curve 기반으로 최적 threshold를 탐색합니다. (이진 분류 전용)
+
+    Day 34에서 다룬 threshold 조정 전략을 함수화한 것입니다.
+    불균형 데이터(사기 탐지, 의료 진단 등)에서 Recall을 높이기 위해 사용합니다.
+
+    Args:
+        y_true:  실제 이진 레이블 (0 또는 1)
+        y_prob:  양성 클래스(1)에 대한 예측 확률 (1D array)
+        metric:  최적화 기준
+                 "f1"      — F1-Score 최대화 (기본값, Precision/Recall 균형)
+                 "recall"  — Recall 최대화 (놓치면 안 되는 상황: 사기 탐지, 암 진단)
+                 "f_beta"  — F_β Score 최대화 (beta 파라미터로 가중치 조절)
+        beta:    F_β의 β값. β > 1이면 Recall 중시, β < 1이면 Precision 중시.
+                 metric="f_beta"일 때만 사용됩니다.
+
+    Returns:
+        (best_threshold, best_score) 튜플
+        - best_threshold : 최적 임계값 (이 값 이상이면 양성으로 분류)
+        - best_score     : 해당 threshold에서의 metric 값
+
+    예시:
+        # Recall 중심 — 사기를 절대 놓치지 않으려는 경우
+        threshold, recall = find_best_threshold(y_test, y_prob, metric="recall")
+        y_pred = (y_prob >= threshold).astype(int)
+
+        # F1 균형
+        threshold, f1 = find_best_threshold(y_test, y_prob, metric="f1")
+    """
+    precisions, recalls, thresholds = precision_recall_curve(y_true, y_prob)
+
+    if metric == "recall":
+        # Recall이 최대인 threshold (thresholds 배열은 precisions/recalls보다 1개 짧음)
+        best_idx = np.argmax(recalls[:-1])
+        return float(thresholds[best_idx]), float(recalls[best_idx])
+
+    if metric == "f_beta":
+        beta2 = beta ** 2
+        scores = (1 + beta2) * (precisions[:-1] * recalls[:-1]) / (
+            beta2 * precisions[:-1] + recalls[:-1] + 1e-8
+        )
+    else:  # f1
+        scores = 2 * (precisions[:-1] * recalls[:-1]) / (
+            precisions[:-1] + recalls[:-1] + 1e-8
+        )
+
+    best_idx = np.argmax(scores)
+    return float(thresholds[best_idx]), float(scores[best_idx])
 
 
 def get_confusion_matrix(y_true, y_pred) -> np.ndarray:
