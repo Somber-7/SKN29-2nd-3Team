@@ -232,8 +232,8 @@ class PricePremiumAnalyzer:
         self,
         premium_df: pd.DataFrame,
         group_col: str,
-        min_count: int = 30,
-        sort_by: str = "평균프리미엄률",
+        min_count: int = 1000,
+        sort_by: str = "중앙값프리미엄률",
         ascending: bool = False,
     ) -> pd.DataFrame:
         """그룹별 평균 프리미엄을 요약합니다.
@@ -332,7 +332,7 @@ class PricePremiumAnalyzer:
         premium_df: pd.DataFrame,
         region_col: str = "시군구",
         group_col: str = "브랜드구분",
-        min_count: int = 30,
+        min_count: int = 1000,
     ) -> pd.DataFrame:
         """지역 x 그룹 기준으로 평균 프리미엄률 피벗 테이블을 만듭니다."""
         required = [region_col, group_col, "프리미엄률", self.target_col]
@@ -376,7 +376,7 @@ if __name__ == "__main__":
         from price_regression_models import XGBoostPriceModel
 
     df = pd.read_csv("data/processed/Apart Deal_6.csv", encoding="utf-8", low_memory=False)
-    df = df[df["시군구"].str.startswith("서울특별시", na=False)].copy()
+    # df = df[df["시군구"].str.startswith("서울특별시", na=False)].copy()
     df["거래연도"] = pd.to_datetime(df["거래일"]).dt.year
 
     # 학습: 2015~2021 / 분석: 2022~2023
