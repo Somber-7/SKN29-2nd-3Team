@@ -21,6 +21,10 @@ matplotlib>=3.8.0
 seaborn>=0.13.0
 plotly>=5.22.0
 
+# Map
+streamlit-folium>=0.20.0
+requests>=2.31.0
+
 # Utilities
 python-dotenv>=1.0.0
 joblib>=1.4.0
