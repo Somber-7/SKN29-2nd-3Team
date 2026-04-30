@@ -2,3 +2,4 @@
 *.csv
 
 trashbin/
+__pycache__
