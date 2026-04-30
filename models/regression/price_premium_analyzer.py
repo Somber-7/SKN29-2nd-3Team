@@ -71,7 +71,7 @@ class PricePremiumAnalyzer:
     household_col: str = "세대수"
     brand_col: str = "브랜드여부"
     station_threshold: int = 1
-    school_threshold: int = 1
+    school_threshold: int = 3
     large_complex_threshold: int = 1000
     premium_bins: list[float] = field(
         default_factory=lambda: [-np.inf, -0.15, -0.05, 0.05, 0.15, np.inf]
@@ -368,7 +368,6 @@ class PricePremiumAnalyzer:
 
 
 if __name__ == "__main__":
-    # 실행 예시는 프로젝트 환경에 맞게 수정해서 사용하세요.
     import pandas as pd
 
     try:
@@ -376,14 +375,25 @@ if __name__ == "__main__":
     except ModuleNotFoundError:
         from price_regression_models import XGBoostPriceModel
 
-    df = pd.read_csv("Apart Deal_6.csv", encoding="cp949")
+    df = pd.read_csv("data/processed/Apart Deal_6.csv", encoding="utf-8", low_memory=False)
+    df = df[df["시군구"].str.startswith("서울특별시", na=False)].copy()
+    df["거래연도"] = pd.to_datetime(df["거래일"]).dt.year
 
-    price_model = XGBoostPriceModel(sample_size=100_000, random_state=42)
-    price_model.fit_from_dataframe(df)
+    # 학습: 2015~2021 / 분석: 2022~2023
+    TRAIN_UNTIL = 2021
+    train_df = df[df["거래연도"] <= TRAIN_UNTIL]
+    analyze_df = df[df["거래연도"] > TRAIN_UNTIL]
+
+    print(f"학습 데이터: {len(train_df):,}건 (2015~{TRAIN_UNTIL})")
+    print(f"분석 데이터: {len(analyze_df):,}건 ({TRAIN_UNTIL+1}~2023)")
+
+    price_model = XGBoostPriceModel(sample_size=None, random_state=42)
+    price_model.fit_from_dataframe(train_df)
 
     analyzer = PricePremiumAnalyzer(price_model=price_model)
-    premium_df = analyzer.analyze(df)
+    premium_df = analyzer.analyze(analyze_df)
 
+    print("\n[모델 성능]")
     print(analyzer.evaluate_price_model(premium_df))
 
     for col in ["역세권여부", "학세권여부", "대단지여부", "브랜드구분", "시군구"]:
