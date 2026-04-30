@@ -58,6 +58,10 @@ GENERAL_BRAND_KEYWORDS = [
     "블루밍", "S-클래스", "한신", "부영", "한라", "풍림",
     "쌍용", "벽산", "동아", "두산", "금호", "코오롱",
     "호반", "우미", "효성", "대방", "서희", "중흥", "반도", "KCC",
+    "대림산업", "삼익주택", "경남기업", "동원개발", "신동아건설", "동부건설",
+    "삼부토건", "현진건설", "금강주택", "성지건설", "광양건설", "라온건설", "아남건설",
+    "현대건설", "삼성물산", "포스코이앤씨", "GS건설", "HDC현대산업개발",
+    "DL이앤씨", "롯데건설",
 ]
 GRADE_ORDER = ["기타", "공공(LH)", "일반브랜드", "프리미엄"]
 
@@ -188,9 +192,9 @@ class BrandGradeClassifier(BaseModel):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         estimator = XGBClassifier(
             objective="multi:softprob",
-            n_estimators=300,
+            n_estimators=1000,
             learning_rate=0.05,
-            max_depth=6,
+            max_depth=8,
             subsample=0.8,
             colsample_bytree=0.8,
             random_state=self.random_state,
@@ -198,17 +202,23 @@ class BrandGradeClassifier(BaseModel):
             n_jobs=-1,
             verbosity=0,
             eval_metric="mlogloss",
+            early_stopping_rounds=30,
         )
         return Pipeline([("preprocessor", preprocessor), ("model", estimator)])
 
-    def fit(self, X_train: pd.DataFrame, y_train: Sequence[str], **kwargs) -> "BrandGradeClassifier":
+    def fit(self, X_train: pd.DataFrame, y_train: Sequence[str], sample_weight: np.ndarray | None = None, **kwargs) -> "BrandGradeClassifier":
         # XGBoost는 문자열 타깃 미지원 — LabelEncoder로 정수 변환
         y_encoded = self._label_encoder.fit_transform(y_train)
         self.classes_ = list(self._label_encoder.classes_)
 
         self._model = self._build_pipeline()
         self._model.named_steps["model"].set_params(num_class=len(self.classes_))
-        self._model.fit(X_train, y_encoded, **kwargs)
+
+        fit_params = dict(kwargs)
+        if sample_weight is not None:
+            fit_params["model__sample_weight"] = sample_weight
+        self._model.fit(X_train, y_encoded, **fit_params)
+
         self._is_trained = True
         self.feature_columns_ = list(X_train.columns)
         return self
@@ -249,11 +259,41 @@ class BrandGradeClassifier(BaseModel):
             stratify=stratify,
         )
 
-        self.fit(X_train, y_train)
+        # 클래스 역비율 가중치 sqrt 완화 — 완전 역비율 대비 절반 강도
+        class_counts = y_train.value_counts()
+        class_weight = np.sqrt(len(y_train) / (len(class_counts) * class_counts))
+        sample_weight = y_train.map(class_weight).to_numpy()
+
+        # Early Stopping용 validation set 분리 (train의 10%)
+        X_tr, X_val, y_tr, y_val, sw_tr, _ = train_test_split(
+            X_train, y_train, sample_weight,
+            test_size=0.1,
+            random_state=self.random_state,
+            stratify=y_train,
+        )
+        y_tr_enc  = self._label_encoder.fit_transform(y_tr)
+        y_val_enc = self._label_encoder.transform(y_val)
+
+        self._model = self._build_pipeline()
+        self._model.named_steps["model"].set_params(num_class=len(set(y_tr_enc)))
+
+        X_tr_prep  = self._model.named_steps["preprocessor"].fit_transform(X_tr)
+        X_val_prep = self._model.named_steps["preprocessor"].transform(X_val)
+
+        self._model.named_steps["model"].fit(
+            X_tr_prep, y_tr_enc,
+            sample_weight=sw_tr,
+            eval_set=[(X_val_prep, y_val_enc)],
+            verbose=False,
+        )
+        self._is_trained = True
+        self.classes_ = list(self._label_encoder.classes_)
+        self.feature_columns_ = list(X_train.columns)
         self.metrics_ = self.evaluate(X_test, y_test)
-        self.metrics_["train_rows"] = int(len(X_train))
-        self.metrics_["test_rows"]  = int(len(X_test))
-        self.metrics_["n_classes"]  = int(y.nunique())
+        self.metrics_["train_rows"]      = int(len(X_train))
+        self.metrics_["test_rows"]       = int(len(X_test))
+        self.metrics_["n_classes"]       = int(y.nunique())
+        self.metrics_["best_iteration"]  = int(self._model.named_steps["model"].best_iteration)
 
         return self.metrics_
 
