@@ -144,7 +144,7 @@ html, body, [class*="css"] {
     transform: translateY(-1px);
     box-shadow: 0 6px 18px rgba(52, 91, 203, 0.45);
 }
-
+ 
 /* Primary 버튼 */
 button[kind="primary"] {
     background: linear-gradient(135deg, #345BCB, #5B8DEF) !important;
