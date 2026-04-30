@@ -14,7 +14,7 @@ utils/preprocessor.py — 데이터 전처리 유틸리티
 ── Apart Deal 전용 함수 ──────────────────────────────────────
 parse_price()       — 거래금액 str → int 변환
 parse_date()        — 거래일 str → datetime, 연/월/분기 파생 피처 추출
-fix_floor()         — 층 -1 이상치를 NaN 처리
+fix_floor()         — 층 결측(NaN) 처리 (음수는 지하층으로 보존)
 map_brand_grade()   — 브랜드 문자열 → 등급(프리미엄/일반/공공/기타) 변환
 """
 
@@ -318,21 +318,20 @@ def parse_date(df: pd.DataFrame, col: str = "거래일") -> pd.DataFrame:
 
 
 def fix_floor(df: pd.DataFrame, col: str = "층") -> pd.DataFrame:
-    """층 컬럼의 음수값(-1 등)을 NaN으로 처리합니다.
+    """층 컬럼의 결측치(NaN)를 처리합니다.
 
-    원본 데이터에서 층이 -1인 경우가 존재하며 이는 입력 오류로 간주합니다.
-    NaN으로 변환 후 impute()로 대체하거나 해당 행을 제거하세요.
+    음수 층(-1, -2 등)은 지하층을 의미하므로 그대로 보존합니다.
+    현재는 NaN 행만 식별 가능하도록 유지하며,
+    모델 학습 시 필요에 따라 impute() 또는 해당 행 제거를 선택하세요.
 
     Args:
         df:  처리할 DataFrame
         col: 층 컬럼명 (기본값: "층")
 
     Returns:
-        음수 층이 NaN으로 대체된 새 DataFrame (원본 불변)
+        원본과 동일한 새 DataFrame (원본 불변)
     """
-    result = df.copy()
-    result[col] = result[col].where(result[col] >= 0, other=np.nan)
-    return result
+    return df.copy()
 
 
 def map_brand_grade(df: pd.DataFrame, col: str = "브랜드") -> pd.DataFrame:
