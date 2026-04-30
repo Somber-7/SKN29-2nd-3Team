@@ -182,12 +182,11 @@ class BaseClusterModel(ABC):
         self._labels: np.ndarray | None = None
 
     @abstractmethod
-    def fit(self, X, **kwargs) -> "BaseClusterModel":
+    def fit(self, X) -> "BaseClusterModel":
         """데이터를 군집화하고 각 샘플의 군집 레이블을 self._labels에 저장합니다.
 
         Args:
             X: 군집화할 피처 데이터
-            **kwargs: 모델별 추가 파라미터
 
         Returns:
             self

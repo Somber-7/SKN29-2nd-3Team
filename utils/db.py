@@ -5,7 +5,7 @@ conf/.env 파일의 접속 정보를 자동으로 로드합니다.
 모든 쿼리 함수는 연결 열기/닫기, commit/rollback을 자동 처리합니다.
 
 사용 예시:
-    from utils.db import fetch_all, fetch_one, execute
+    from utils.db import fetch_all, fetch_one, execute, load_apart_deals
 
     # 여러 행 조회
     rows = fetch_all("SELECT * FROM users WHERE age > %s", (20,))
@@ -15,12 +15,19 @@ conf/.env 파일의 접속 정보를 자동으로 로드합니다.
 
     # INSERT / UPDATE / DELETE
     affected = execute("DELETE FROM logs WHERE id = %s", (42,))
+
+    # 아파트 거래 데이터 — 한글 컬럼명 DataFrame으로 반환
+    import pandas as pd
+    df = load_apart_deals(limit=100_000)
+    df = load_apart_deals(sigungu="강남구", limit=50_000)
 """
 
 import os
 from pathlib import Path
 from contextlib import contextmanager
+from typing import Optional
 
+import pandas as pd
 import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
@@ -124,3 +131,83 @@ def execute(query: str, params: tuple = ()) -> int:
     with db_cursor() as cursor:
         cursor.execute(query, params)
         return cursor.rowcount
+
+
+# ── Apart Deal 전용 ───────────────────────────────────
+
+# DB 영문 컬럼명 → 원본 한글 컬럼명 매핑
+# 모델 파일은 한글 컬럼명 기준으로 작성되어 있으므로 쿼리에서 alias 처리합니다.
+_ALIAS_SQL = """
+    region_code   AS 지역코드,
+    sigungu       AS 시군구,
+    dong          AS 법정동,
+    jibun         AS 지번,
+    apt_name      AS 아파트,
+    brand         AS 브랜드,
+    is_brand      AS 브랜드여부,
+    build_year    AS 건축년도,
+    household_cnt AS 세대수,
+    deal_date     AS 거래일,
+    floor         AS 층,
+    area          AS 전용면적,
+    deal_amount   AS 거래금액,
+    base_rate     AS 기준금리,
+    latitude      AS 위도,
+    longitude     AS 경도,
+    school_cnt    AS 인근학교수,
+    station_cnt   AS 인근역수
+"""
+
+
+def load_apart_deals(
+    sigungu: Optional[str] = None,
+    apt_name: Optional[str] = None,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
+    limit: Optional[int] = None,
+) -> pd.DataFrame:
+    """tbl_apart_deals를 한글 컬럼명 DataFrame으로 반환합니다.
+
+    모델 파일(classification, clustering 등)이 기대하는 한글 컬럼명을
+    DB 조회 시 alias로 자동 변환하여 반환합니다.
+
+    Args:
+        sigungu:   시군구 필터 (예: "강남구"). None이면 전체.
+        apt_name:  아파트명 필터 (부분 일치). None이면 전체.
+        year_from: 거래 시작 연도 (포함). None이면 제한 없음.
+        year_to:   거래 종료 연도 (포함). None이면 제한 없음.
+        limit:     최대 반환 행 수. None이면 전체 (500만 건 주의).
+
+    Returns:
+        한글 컬럼명을 가진 pandas DataFrame.
+        컬럼: 지역코드, 시군구, 법정동, 지번, 아파트, 브랜드, 브랜드여부,
+              건축년도, 세대수, 거래일, 층, 전용면적, 거래금액,
+              기준금리, 위도, 경도, 인근학교수, 인근역수
+
+    예시:
+        df = load_apart_deals(sigungu="강남구", limit=50_000)
+        df = load_apart_deals(year_from=2020, year_to=2023, limit=100_000)
+    """
+    conditions = []
+    params = []
+
+    if sigungu:
+        conditions.append("sigungu = %s")
+        params.append(sigungu)
+    if apt_name:
+        conditions.append("apt_name LIKE %s")
+        params.append(f"%{apt_name}%")
+    if year_from:
+        conditions.append("YEAR(deal_date) >= %s")
+        params.append(year_from)
+    if year_to:
+        conditions.append("YEAR(deal_date) <= %s")
+        params.append(year_to)
+
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    limit_clause = f"LIMIT {int(limit)}" if limit else ""
+
+    query = f"SELECT {_ALIAS_SQL} FROM tbl_apart_deals {where} {limit_clause}"
+
+    rows = fetch_all(query, tuple(params))
+    return pd.DataFrame(rows)
