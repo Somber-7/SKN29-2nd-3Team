@@ -32,6 +32,8 @@ import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
 
+_CACHE_PATH = Path(__file__).parent.parent / "data" / "cache" / "apart_deals.parquet"
+
 load_dotenv(Path(__file__).parent.parent / "conf" / ".env")
 
 
@@ -165,6 +167,7 @@ def load_apart_deals(
     year_from: Optional[int] = None,
     year_to: Optional[int] = None,
     limit: Optional[int] = None,
+    use_cache: bool = True,
 ) -> pd.DataFrame:
     """tbl_apart_deals를 한글 컬럼명 DataFrame으로 반환합니다.
 
@@ -177,6 +180,8 @@ def load_apart_deals(
         year_from: 거래 시작 연도 (포함). None이면 제한 없음.
         year_to:   거래 종료 연도 (포함). None이면 제한 없음.
         limit:     최대 반환 행 수. None이면 전체 (500만 건 주의).
+        use_cache: True면 Parquet 캐시 사용 (필터/limit 없는 전체 조회 시만 적용).
+                   캐시 없으면 DB에서 로딩 후 자동 저장. False면 항상 DB 조회.
 
     Returns:
         한글 컬럼명을 가진 pandas DataFrame.
@@ -185,9 +190,18 @@ def load_apart_deals(
               기준금리, 위도, 경도, 인근학교수, 인근역수
 
     예시:
-        df = load_apart_deals(sigungu="강남구", limit=50_000)
-        df = load_apart_deals(year_from=2020, year_to=2023, limit=100_000)
+        df = load_apart_deals()                                  # 캐시 사용 (빠름)
+        df = load_apart_deals(use_cache=False)                   # DB 직접 조회 + 캐시 갱신
+        df = load_apart_deals(sigungu="강남구", limit=50_000)    # 필터 시 항상 DB 조회
     """
+    is_full_load = not any([sigungu, apt_name, year_from, year_to, limit])
+
+    if use_cache and is_full_load:
+        if _CACHE_PATH.exists():
+            print(f"[cache] Parquet 캐시 로딩 — {_CACHE_PATH}")
+            return pd.read_parquet(_CACHE_PATH)
+        print("[cache] 캐시 없음 — DB에서 전체 로딩 후 저장합니다.")
+
     conditions = []
     params = []
 
@@ -210,4 +224,11 @@ def load_apart_deals(
     query = f"SELECT {_ALIAS_SQL} FROM tbl_apart_deals {where} {limit_clause}"
 
     rows = fetch_all(query, tuple(params))
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+
+    if use_cache and is_full_load:
+        _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(_CACHE_PATH, index=False)
+        print(f"[cache] Parquet 캐시 저장 완료 — {_CACHE_PATH}")
+
+    return df

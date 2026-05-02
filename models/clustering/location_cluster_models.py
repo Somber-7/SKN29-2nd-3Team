@@ -30,6 +30,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.cluster import MiniBatchKMeans
+from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 from models.base import BaseClusterModel
@@ -66,8 +67,13 @@ class KMeansLocationClusterModel(BaseClusterModel):
     전체 500만 건을 미니배치로 처리하여 메모리 효율적으로 학습합니다.
 
     파생 피처:
-        평당가   = log1p(거래금액 / (전용면적 / 3.3))
-        건물연식 = current_year - 건축년도
+        평당가     = log1p(거래금액 / (전용면적 / 3.3))
+        건물연식   = current_year - 건축년도
+        거래활성도 = 아파트별 거래건수 / 전체 거래건수 (fit 시 계산, predict 시 저장맵 사용)
+
+    PCA:
+        n_components가 None이 아니면 StandardScaler+가중치 후 PCA 적용.
+        n_components=0.95면 분산 95% 유지, 정수면 해당 차원 수로 축소.
     """
 
     def __init__(
@@ -79,6 +85,7 @@ class KMeansLocationClusterModel(BaseClusterModel):
         random_state: int = 42,
         feature_cols: Optional[list[str]] = None,
         feature_weights: Optional[dict[str, float]] = None,
+        n_components: Optional[int | float] = None,
     ):
         super().__init__(name="KMeansLocationCluster(MiniBatch)")
         self.n_clusters   = n_clusters
@@ -86,14 +93,17 @@ class KMeansLocationClusterModel(BaseClusterModel):
         self.batch_size   = batch_size
         self.current_year = current_year
         self.random_state = random_state
+        self.n_components = n_components
         self.feature_cols = feature_cols or [
-            "위도", "경도", "평당가", "건물연식",
+            "위도", "경도", "평당가", "건물연식", "거래활성도",
         ]
         # 위도/경도에 3배 가중치 — 지리 기반 군집을 더 선명하게
         self.feature_weights = feature_weights or {"위도": 3.0, "경도": 3.0}
         self._scaler: Optional[StandardScaler] = None
+        self._pca: Optional[PCA] = None
         self.fitted_feature_index_: Optional[pd.Index] = None
         self.metrics_: Optional[dict] = None
+        self.apt_activity_map_: Optional[pd.Series] = None
 
     @staticmethod
     def _clean_numeric(series: pd.Series) -> pd.Series:
@@ -109,10 +119,10 @@ class KMeansLocationClusterModel(BaseClusterModel):
 
     def prepare_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """원본 DataFrame을 군집화용 피처 DataFrame으로 변환합니다."""
-        required = ["위도", "경도", "거래금액", "전용면적", "건축년도"]
+        required = ["위도", "경도", "거래금액", "전용면적", "건축년도", "아파트"]
         self._validate_columns(df, required)
 
-        extra = ["인근학교수", "인근역수", "세대수", "시군구", "법정동", "아파트", "지역코드"]
+        extra = ["인근학교수", "인근역수", "세대수", "시군구", "법정동", "지역코드"]
         use_cols = list(dict.fromkeys(required + [c for c in extra if c in df.columns]))
         data = df[use_cols].copy()
 
@@ -124,6 +134,16 @@ class KMeansLocationClusterModel(BaseClusterModel):
 
         data["평당가"]   = np.log1p(data["거래금액"] / (data["전용면적"] / 3.3))
         data["건물연식"] = self.current_year - data["건축년도"]
+
+        if self.apt_activity_map_ is not None:
+            # predict 경로: 학습 시 저장된 맵으로 매핑 (미등록 단지는 중앙값 대체)
+            data["거래활성도"] = data["아파트"].map(self.apt_activity_map_).fillna(
+                self.apt_activity_map_.median()
+            )
+        else:
+            # fit 경로: 현재 데이터 기준으로 계산
+            apt_counts = data["아파트"].map(data["아파트"].value_counts())
+            data["거래활성도"] = apt_counts / len(data)
 
         data = data.replace([np.inf, -np.inf], np.nan)
         data = data.dropna(subset=self.feature_cols)
@@ -156,6 +176,12 @@ class KMeansLocationClusterModel(BaseClusterModel):
             list(X_feat.columns),
         )
 
+        if self.n_components is not None:
+            self._pca = PCA(n_components=self.n_components, random_state=self.random_state)
+            X_scaled = self._pca.fit_transform(X_scaled)
+            explained = self._pca.explained_variance_ratio_.sum()
+            print(f"[{self.name}] PCA 적용 — {X_feat.shape[1]}차원 → {X_scaled.shape[1]}차원 (분산 {explained:.1%} 유지)")
+
         print(f"[{self.name}] 학습 시작 — n={len(X_scaled):,}, k={self.n_clusters}, batch={self.batch_size:,}, weights={self.feature_weights}")
 
         self._model = MiniBatchKMeans(
@@ -176,26 +202,32 @@ class KMeansLocationClusterModel(BaseClusterModel):
     def fit_from_dataframe(self, df: pd.DataFrame) -> "KMeansLocationClusterModel":
         """원본 DataFrame을 받아 군집화 모델을 학습합니다."""
         data = self.prepare_dataframe(df)
+        # 거래활성도 맵 저장 — predict 시 누수 없이 재사용
+        if "거래활성도" in self.feature_cols:
+            self.apt_activity_map_ = (
+                data["아파트"].value_counts() / len(data)
+            ).rename("거래활성도")
         return self.fit(data[self.feature_cols])
+
+    def _transform(self, X: pd.DataFrame) -> np.ndarray:
+        """StandardScaler + 가중치 + PCA(옵션) 변환."""
+        X_feat   = self._prepare_features(X)
+        X_scaled = self._apply_weights(self._scaler.transform(X_feat), list(X_feat.columns))
+        if self._pca is not None:
+            X_scaled = self._pca.transform(X_scaled)
+        return X_scaled
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """학습된 모델로 새 데이터의 군집 레이블을 반환합니다."""
         if self._labels is None:
             raise RuntimeError(f"[{self.name}] fit()을 먼저 호출하세요.")
-
-        X_feat   = self._prepare_features(X)
-        X_scaled = self._apply_weights(self._scaler.transform(X_feat), list(X_feat.columns))
-        return self._model.predict(X_scaled)
+        return self._model.predict(self._transform(X))
 
     def evaluate(self, X: pd.DataFrame) -> dict:
         if self._labels is None:
             raise RuntimeError(f"[{self.name}] fit()을 먼저 호출하세요.")
-        X_feat   = self._prepare_features(X)
-        X_scaled = self._apply_weights(self._scaler.transform(X_feat), list(X_feat.columns))
-        if len(X_scaled) == len(self._labels):
-            labels = self._labels
-        else:
-            labels = self.predict(X)
+        X_scaled = self._transform(X)
+        labels = self._labels if len(X_scaled) == len(self._labels) else self._model.predict(X_scaled)
         return _clustering_metrics(X_scaled, labels)
 
     def add_cluster_labels(self, df: pd.DataFrame, label_col: str = "cluster") -> pd.DataFrame:
