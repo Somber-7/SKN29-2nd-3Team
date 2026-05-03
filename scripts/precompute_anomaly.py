@@ -143,7 +143,7 @@ def run_anomaly(df: pd.DataFrame) -> None:
         CACHE_DIR / "anomaly_scores.parquet", index=False
     )
 
-    print(f"  저장 완료 ({time.time()-t:.0f}초) — 6개 파일")
+    print(f"  저장 완료 ({time.time()-t:.0f}초) - 6개 파일")
 
 
 # =============================================================================
@@ -180,7 +180,7 @@ def run_seoul(df: pd.DataFrame) -> None:
     summary.reset_index().to_parquet(CACHE_DIR / "seoul_summary.parquet", index=False)
     top_by_district.to_parquet(CACHE_DIR / "seoul_top_by_district.parquet", index=False)
 
-    print(f"  저장 완료 ({time.time()-t:.0f}초) — 3개 파일")
+    print(f"  저장 완료 ({time.time()-t:.0f}초) - 3개 파일")
 
 
 # =============================================================================
@@ -226,7 +226,7 @@ def run_location(df: pd.DataFrame) -> None:
     ] if c in anomaly_rows.columns]
     anomaly_rows[keep_cols].to_parquet(CACHE_DIR / "location_anomalies.parquet", index=False)
 
-    print(f"  저장 완료 ({time.time()-t:.0f}초) — 4개 파일")
+    print(f"  저장 완료 ({time.time()-t:.0f}초) - 4개 파일")
 
 
 # =============================================================================
@@ -250,7 +250,7 @@ if __name__ == "__main__":
 
     elapsed = time.time() - total_start
     print("\n" + "=" * 60)
-    print(f"전체 완료 — 총 소요 시간: {elapsed/60:.1f}분")
+    print(f"전체 완료 - 총 소요 시간: {elapsed/60:.1f}분")
     print(f"저장된 파일 수: 13개")
     print("이제 Streamlit 앱이 캐시 파일을 즉시 로드합니다.")
     print("=" * 60)
