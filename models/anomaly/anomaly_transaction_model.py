@@ -380,5 +380,5 @@ if __name__ == "__main__":
 
     print("\n=== 5. 중복 제거된 진짜 특이 거래 TOP 10 ===")
     top_anomalies = final_result_df[final_result_df["anomaly_raw_label"] == -1].sort_values("anomaly_score", ascending=True).head(10)
-    
+     
     print(top_anomalies[['시군구', '아파트', '거래금액', '전용면적', '층', '건축년도', 'anomaly_score', 'anomaly_rank']])

@@ -394,3 +394,4 @@ if __name__ == "__main__":
 
     model.save("seoul_district_anomaly_model.joblib")
     print("\n모델 저장 완료: seoul_district_anomaly_model.joblib")
+ 
