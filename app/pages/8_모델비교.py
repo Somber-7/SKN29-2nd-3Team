@@ -27,11 +27,10 @@ page_header("모델 비교 — 회귀 / 분류 성능 비교")
 
 # 더미 회귀 성능
 REG_DATA = pd.DataFrame({
-    "모델":      ["Linear", "RandomForest", "LightGBM", "XGBoost", "DNN"],
-    "MAE":       [2100,      1400,           1200,       1150,      1100],
-    "RMSE":      [3200,      2100,           1850,       1780,      1700],
-    "R²":        [0.72,      0.84,           0.89,       0.90,      0.91],
-    "학습시간(s)":[0.1,       12.4,           3.2,        4.1,       28.6],
+    "모델":      ["Linear", "RandomForest", "LightGBM", "XGBoost"],
+    "MAE":       [8692,      4106,           4020,       3976],
+    "RMSE":      [12169,     5543,           5387,       5298],
+    "R²":        [0.705,      0.906,           0.926,       0.929],
 })
 
 # 더미 분류 성능
@@ -64,7 +63,7 @@ with tab_reg:
     chart_card_open()
     st.dataframe(
         REG_DATA.style.apply(highlight_best_reg, axis=1)
-            .format({"MAE": "{:,}", "RMSE": "{:,}", "R²": "{:.2f}", "학습시간(s)": "{:.1f}"}),
+            .format({"MAE": "{:,}", "RMSE": "{:,}", "R²": "{:.3f}", "학습시간(s)": "{:.1f}"}),
         use_container_width=True, hide_index=True,
     )
     chart_card_close()
@@ -81,7 +80,7 @@ with tab_reg:
             y=REG_DATA["모델"],
             orientation="h",
             marker_color=["#93C5FD","#60A5FA","#3B82F6","#2563EB","#1D4ED8"],
-            text=REG_DATA["R²"].apply(lambda v: f"{v:.2f}"),
+            text=REG_DATA["R²"].apply(lambda v: f"{v:.3f}"),
             textposition="outside",
         ))
         fig.update_layout(
