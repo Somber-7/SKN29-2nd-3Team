@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from typing import Optional, Iterable
 
+import joblib
 import numpy as np
 import pandas as pd
 import torch
@@ -288,3 +289,15 @@ class TorchKMeansLocationClusterModel(BaseClusterModel):
             "feature_weights": self.feature_weights,
             "device":          self.device,
         }
+
+    def save(self, path: str) -> None:
+        if self.centroids_ is None:
+            raise RuntimeError(f"[{self.name}] fit_from_dataframe()을 먼저 호출하세요.")
+        joblib.dump(self, path)
+
+    @classmethod
+    def load(cls, path: str) -> "TorchKMeansLocationClusterModel":
+        loaded = joblib.load(path)
+        if not isinstance(loaded, cls):
+            raise TypeError(f"불러온 객체가 {cls.__name__}이 아닙니다.")
+        return loaded

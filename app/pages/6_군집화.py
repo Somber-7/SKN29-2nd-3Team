@@ -6,252 +6,179 @@ import os
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import streamlit.components.v1 as components
 from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans, DBSCAN
-from sklearn.cluster import AgglomerativeClustering
-from sklearn.preprocessing import StandardScaler
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from utils.ui import (
     load_css, render_sidebar, page_header,
-    section_badge, stat_card, chart_card_open, chart_card_close,
+    section_badge, stat_card,
 )
 
 st.set_page_config(page_title="군집화", layout="wide")
 load_css()
 render_sidebar()
 
-page_header("군집화 — 단지 / 지역 군집 분석")
-
-# ── 더미 데이터 생성 (실제 연결 시 DB 로드로 교체)
-@st.cache_data
-def load_dummy_data(n=500):
-    # TODO: 실제 데이터 연결
-    # ── 백엔드 연결 포인트 ──────────────────────────────
-    # from utils.db import fetch_all
-    # rows = fetch_all("""
-    #     SELECT 전용면적, 층, 건축연도, 거래금액
-    #     FROM apart_deal
-    #     WHERE 시도 = %s
-    #     LIMIT 5000
-    # """, (sido,))
-    # df = pd.DataFrame(rows)
-    # df = parse_price(df); df = fix_floor(df)
-    # ────────────────────────────────────────────────────
-    np.random.seed(42)
-    df = pd.DataFrame({
-        "전용면적": np.random.normal(84,  30, n).clip(20, 200),
-        "층":       np.random.normal(12,   6, n).clip(1, 50),
-        "건축연도": np.random.normal(2005, 10, n).clip(1980, 2023),
-        "거래금액": np.random.normal(60000, 25000, n).clip(10000, 200000),
-    })
-    return df
-
-df_raw = load_dummy_data()
-
-# ── 전처리 (스케일링)
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(df_raw)
-
-# ── PCA 2D 축소 (시각화용)
-pca = PCA(n_components=2, random_state=42)
-X_2d = pca.fit_transform(X_scaled)
-
-MODEL_LABELS = ["🔵 KMeans", "🟡 DBSCAN", "🟢 Agglomerative"]
-tabs = st.tabs(MODEL_LABELS)
+page_header("군집화 — 지역 군집 분석")
 
 CLUSTER_COLORS = [
-    "#345BCB","#EF4444","#10B981","#F97316",
-    "#8B5CF6","#EC4899","#14B8A6","#F59E0B",
+    "#345BCB", "#EF4444", "#10B981", "#F97316",
+    "#8B5CF6", "#EC4899", "#14B8A6", "#F59E0B",
 ]
 
-# ══════════════════════════════
-# KMeans
-# ══════════════════════════════
-with tabs[0]:
-    col_left, col_right = st.columns([1, 2])
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "models", "torch_kmeans_clustering.pkl")
 
-    with col_left:
-        section_badge("⚙️", "KMeans 파라미터")
-        n_clusters = st.slider("군집 수 (k)", 2, 10, 4, key="km_k")
-        init_method = st.selectbox("초기화 방법", ["k-means++", "random"], key="km_init")
-        max_iter = st.slider("최대 반복 횟수", 100, 500, 300, step=50, key="km_iter")
-        run_btn = st.button("군집화 실행", type="primary",
-                            use_container_width=True, key="run_km")
 
-    with col_right:
-        section_badge("📊", "군집 결과 시각화")
+@st.cache_resource
+def load_model():
+    from models.clustering.torch_kmeans_models import TorchKMeansLocationClusterModel
+    m = TorchKMeansLocationClusterModel.load(MODEL_PATH)
+    # Streamlit 환경에서 GPU 크래시 방지
+    m.device = "cpu"
+    return m
 
-        # TODO: 실제 KMeans 모델로 교체
-        # from models.clustering.kmeans import KMeansModel
-        # model = KMeansModel(n_clusters=n_clusters)
-        # model.fit(X_scaled)
-        # labels = model._labels
-        km = KMeans(n_clusters=n_clusters, init=init_method,
-                    max_iter=max_iter, random_state=42, n_init=10)
-        labels = km.fit_predict(X_scaled)
 
-        chart_card_open()
-        fig = go.Figure()
-        for i in range(n_clusters):
-            mask = labels == i
-            fig.add_trace(go.Scatter(
-                x=X_2d[mask, 0], y=X_2d[mask, 1],
-                mode="markers",
-                marker=dict(size=5, color=CLUSTER_COLORS[i % len(CLUSTER_COLORS)], opacity=0.6),
-                name=f"군집 {i+1}",
-            ))
-        fig.update_layout(
-            title="KMeans 군집 결과 (PCA 2D)",
-            height=380, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=40, b=0),
-            xaxis=dict(showgrid=True, gridcolor="#F0F4F8", title="PC1"),
-            yaxis=dict(showgrid=True, gridcolor="#F0F4F8", title="PC2"),
-        )
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
+with st.spinner("모델 로딩 중..."):
+    try:
+        model = load_model()
+        load_ok = True
+    except Exception as e:
+        st.error(f"모델 로드 실패: {e}")
+        load_ok = False
 
-    st.markdown("<br>", unsafe_allow_html=True)
+if not load_ok:
+    st.stop()
 
-    # ── 성능 지표
-    section_badge("📐", "군집 평가 지표")
-    # TODO: utils/metrics.py의 clustering_metrics() 연결
-    # from utils.metrics import clustering_metrics
-    # metrics = clustering_metrics(X_scaled, labels)
-    from sklearn.metrics import silhouette_score, davies_bouldin_score
-    sil = silhouette_score(X_scaled, labels)
-    dbi = davies_bouldin_score(X_scaled, labels)
+metrics    = model.metrics_ or {}
+n_clusters = model.n_clusters
+labels_all = model._labels
+centroids  = model.centroids_
+feature_cols = model.feature_cols
+scaler       = model._scaler
 
-    mc1, mc2, mc3 = st.columns(3)
-    mc1.markdown(stat_card(f"{sil:.3f}", "Silhouette Score", "1에 가까울수록 좋음"), unsafe_allow_html=True)
-    mc2.markdown(stat_card(f"{dbi:.3f}", "Davies-Bouldin",   "0에 가까울수록 좋음"), unsafe_allow_html=True)
-    mc3.markdown(stat_card(str(n_clusters), "군집 수", ""), unsafe_allow_html=True)
+# ── 성능 지표
+section_badge("📐", "군집 평가 지표")
+mc1, mc2, mc3, mc4 = st.columns(4)
+mc1.markdown(stat_card(str(n_clusters),                                 "군집 수"),                               unsafe_allow_html=True)
+mc2.markdown(stat_card(f"{metrics.get('Silhouette', 0):.4f}",          "Silhouette Score", "1에 가까울수록 좋음"), unsafe_allow_html=True)
+mc3.markdown(stat_card(f"{metrics.get('Davies-Bouldin', 0):.4f}",      "Davies-Bouldin",   "0에 가까울수록 좋음"), unsafe_allow_html=True)
+mc4.markdown(stat_card(f"{metrics.get('Calinski-Harabasz', 0):,.0f}",  "Calinski-Harabasz","클수록 좋음"),         unsafe_allow_html=True)
 
-    # ── 군집별 평균 가격
-    st.markdown("<br>", unsafe_allow_html=True)
-    section_badge("💰", "군집별 평균 거래금액", color="#F97316")
-    df_raw["군집"] = [f"군집 {l+1}" for l in labels]
-    group_mean = df_raw.groupby("군집")["거래금액"].mean().reset_index()
+st.markdown("<br>", unsafe_allow_html=True)
 
-    chart_card_open()
-    fig2 = go.Figure(go.Bar(
-        x=group_mean["군집"],
-        y=group_mean["거래금액"],
-        marker_color=CLUSTER_COLORS[:n_clusters],
-        text=group_mean["거래금액"].apply(lambda v: f"{int(v):,}만원"),
-        textposition="outside",
+# ── 군집 결과 시각화 (PCA 2D)
+section_badge("📊", "군집 결과 시각화 (PCA 2D)")
+
+pca = PCA(n_components=2, random_state=42)
+centroids_2d = pca.fit_transform(centroids)
+
+fig = go.Figure()
+for i in range(n_clusters):
+    fig.add_trace(go.Scatter(
+        x=[centroids_2d[i, 0]],
+        y=[centroids_2d[i, 1]],
+        mode="markers+text",
+        marker=dict(size=20, color=CLUSTER_COLORS[i % len(CLUSTER_COLORS)], symbol="star"),
+        text=[f"군집 {i+1}"],
+        textposition="top center",
+        name=f"군집 {i+1} 중심",
     ))
-    fig2.update_layout(
-        height=280, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=0, r=0, t=10, b=0),
-        yaxis=dict(showgrid=True, gridcolor="#F0F4F8"),
+fig.update_layout(
+    title=f"군집 중심점 (PCA 2D, k={n_clusters})",
+    height=400,
+    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+    margin=dict(l=0, r=0, t=40, b=0),
+    xaxis=dict(showgrid=True, gridcolor="#F0F4F8", title="PC1"),
+    yaxis=dict(showgrid=True, gridcolor="#F0F4F8", title="PC2"),
+)
+st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ── 군집 중심 지도 (Folium)
+if "위도" in feature_cols and "경도" in feature_cols:
+    section_badge("🗺️", "군집 중심 지도", color="#10B981")
+
+    lat_idx = feature_cols.index("위도")
+    lon_idx = feature_cols.index("경도")
+
+    centroids_unweighted = centroids.copy()
+    centroids_unweighted[:, lat_idx] /= model.feature_weights.get("위도", 1.0)
+    centroids_unweighted[:, lon_idx] /= model.feature_weights.get("경도", 1.0)
+    centroids_orig = scaler.inverse_transform(centroids_unweighted)
+    center_lats = centroids_orig[:, lat_idx]
+    center_lons = centroids_orig[:, lon_idx]
+
+    m = folium.Map(
+        location=[float(center_lats.mean()), float(center_lons.mean())],
+        zoom_start=6,
+        tiles="CartoDB positron",
     )
-    st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
-    chart_card_close()
+    for i in range(n_clusters):
+        color = CLUSTER_COLORS[i % len(CLUSTER_COLORS)]
+        folium.CircleMarker(
+            location=[float(center_lats[i]), float(center_lons[i])],
+            radius=18,
+            color=color,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.8,
+            popup=folium.Popup(f"<b>군집 {i+1}</b>", max_width=120),
+            tooltip=f"군집 {i+1}",
+        ).add_to(m)
+        folium.Marker(
+            location=[float(center_lats[i]), float(center_lons[i])],
+            icon=folium.DivIcon(
+                html=f'<div style="font-size:12px; font-weight:700; color:{color}; white-space:nowrap; margin-top:-28px; margin-left:22px;">군집 {i+1}</div>',
+                icon_size=(80, 20),
+            ),
+        ).add_to(m)
 
-# ══════════════════════════════
-# DBSCAN
-# ══════════════════════════════
-with tabs[1]:
-    col_left, col_right = st.columns([1, 2])
-
-    with col_left:
-        section_badge("⚙️", "DBSCAN 파라미터")
-        eps = st.slider("eps (반경)", 0.1, 2.0, 0.5, step=0.05, key="db_eps")
-        min_samples = st.slider("min_samples", 3, 20, 5, key="db_min")
-        st.info("💡 라벨 -1 = 노이즈 포인트")
-        run_btn2 = st.button("군집화 실행", type="primary",
-                             use_container_width=True, key="run_db")
-
-    with col_right:
-        section_badge("📊", "군집 결과 시각화")
-
-        # TODO: models/clustering/dbscan.py 연결
-        db = DBSCAN(eps=eps, min_samples=min_samples)
-        labels_db = db.fit_predict(X_scaled)
-        n_clusters_db = len(set(labels_db)) - (1 if -1 in labels_db else 0)
-        noise_cnt = int((labels_db == -1).sum())
-
-        chart_card_open()
-        fig = go.Figure()
-        unique_labels = sorted(set(labels_db))
-        for lbl in unique_labels:
-            mask = labels_db == lbl
-            name  = f"노이즈 ({noise_cnt}개)" if lbl == -1 else f"군집 {lbl+1}"
-            color = "#D1D5DB" if lbl == -1 else CLUSTER_COLORS[lbl % len(CLUSTER_COLORS)]
-            fig.add_trace(go.Scatter(
-                x=X_2d[mask, 0], y=X_2d[mask, 1],
-                mode="markers",
-                marker=dict(size=5, color=color, opacity=0.6),
-                name=name,
-            ))
-        fig.update_layout(
-            title=f"DBSCAN 결과 (군집 {n_clusters_db}개, 노이즈 {noise_cnt}개)",
-            height=380, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=40, b=0),
-            xaxis=dict(showgrid=True, gridcolor="#F0F4F8", title="PC1"),
-            yaxis=dict(showgrid=True, gridcolor="#F0F4F8", title="PC2"),
-        )
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
-
+    st_folium(m, width="100%", height=480, returned_objects=[])
     st.markdown("<br>", unsafe_allow_html=True)
-    section_badge("📐", "군집 평가 지표")
-    mc1, mc2, mc3 = st.columns(3)
-    mc1.markdown(stat_card(str(n_clusters_db), "발견된 군집 수", ""), unsafe_allow_html=True)
-    mc2.markdown(stat_card(str(noise_cnt),     "노이즈 포인트",  "라벨 -1"), unsafe_allow_html=True)
-    if n_clusters_db > 1:
-        valid_mask = labels_db != -1
-        sil_db = silhouette_score(X_scaled[valid_mask], labels_db[valid_mask])
-        mc3.markdown(stat_card(f"{sil_db:.3f}", "Silhouette Score", "노이즈 제외"), unsafe_allow_html=True)
-    else:
-        mc3.markdown(stat_card("N/A", "Silhouette Score", "군집 2개 이상 필요"), unsafe_allow_html=True)
 
-# ══════════════════════════════
-# Agglomerative
-# ══════════════════════════════
-with tabs[2]:
-    col_left, col_right = st.columns([1, 2])
+# ── 군집별 피처 평균
+section_badge("📋", "군집별 피처 평균", color="#F97316")
 
-    with col_left:
-        section_badge("⚙️", "Agglomerative 파라미터")
-        n_clusters_ag = st.slider("군집 수", 2, 10, 4, key="ag_k")
-        linkage = st.selectbox("Linkage", ["ward", "complete", "average", "single"], key="ag_link")
-        run_btn3 = st.button("군집화 실행", type="primary",
-                             use_container_width=True, key="run_ag")
+centroids_unweighted_all = centroids.copy()
+for col, w in model.feature_weights.items():
+    if col in feature_cols:
+        centroids_unweighted_all[:, feature_cols.index(col)] /= w
+centroids_orig_all = scaler.inverse_transform(centroids_unweighted_all)
 
-    with col_right:
-        section_badge("📊", "군집 결과 시각화")
+summary_df = pd.DataFrame(centroids_orig_all, columns=feature_cols)
+summary_df.index = [f"군집 {i+1}" for i in range(n_clusters)]
 
-        # TODO: models/clustering/agglomerative.py 연결
-        ag = AgglomerativeClustering(n_clusters=n_clusters_ag, linkage=linkage)
-        labels_ag = ag.fit_predict(X_scaled)
+if "평당가" in summary_df.columns:
+    summary_df["평당가(만원/평)"] = np.expm1(summary_df["평당가"]).round(0).astype(int)
+    summary_df = summary_df.drop(columns=["평당가"])
+if "건물연식" in summary_df.columns:
+    summary_df["건물연식"] = summary_df["건물연식"].round(1)
+for col in ["위도", "경도"]:
+    if col in summary_df.columns:
+        summary_df[col] = summary_df[col].round(4)
 
-        chart_card_open()
-        fig = go.Figure()
-        for i in range(n_clusters_ag):
-            mask = labels_ag == i
-            fig.add_trace(go.Scatter(
-                x=X_2d[mask, 0], y=X_2d[mask, 1],
-                mode="markers",
-                marker=dict(size=5, color=CLUSTER_COLORS[i % len(CLUSTER_COLORS)], opacity=0.6),
-                name=f"군집 {i+1}",
-            ))
-        fig.update_layout(
-            title=f"Agglomerative 결과 (linkage={linkage})",
-            height=380, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=40, b=0),
-            xaxis=dict(showgrid=True, gridcolor="#F0F4F8", title="PC1"),
-            yaxis=dict(showgrid=True, gridcolor="#F0F4F8", title="PC2"),
-        )
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
+st.dataframe(summary_df.style.format({
+    c: "{:,.2f}" for c in summary_df.select_dtypes("float").columns
+}), use_container_width=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    section_badge("📐", "군집 평가 지표")
-    sil_ag = silhouette_score(X_scaled, labels_ag)
-    dbi_ag = davies_bouldin_score(X_scaled, labels_ag)
-    mc1, mc2, mc3 = st.columns(3)
-    mc1.markdown(stat_card(f"{sil_ag:.3f}", "Silhouette Score", ""), unsafe_allow_html=True)
-    mc2.markdown(stat_card(f"{dbi_ag:.3f}", "Davies-Bouldin",   ""), unsafe_allow_html=True)
-    mc3.markdown(stat_card(str(n_clusters_ag), "군집 수", ""), unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ── 군집 크기 바차트
+section_badge("📊", "군집별 데이터 비율")
+cluster_counts = pd.Series(labels_all).value_counts().sort_index()
+
+fig3 = go.Figure(go.Bar(
+    x=[f"군집 {i+1}" for i in cluster_counts.index],
+    y=cluster_counts.values,
+    marker_color=[CLUSTER_COLORS[i % len(CLUSTER_COLORS)] for i in cluster_counts.index],
+    text=[f"{v:,}건" for v in cluster_counts.values],
+    textposition="outside",
+))
+fig3.update_layout(
+    height=280,
+    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+    margin=dict(l=0, r=0, t=10, b=0),
+    yaxis=dict(showgrid=True, gridcolor="#F0F4F8"),
+)
+st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})

@@ -6,7 +6,7 @@ import os
 import numpy as np
 import plotly.graph_objects as go
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from utils.ui import (
     load_css, render_sidebar, page_header,
     section_badge, stat_card, chart_card_open, chart_card_close,

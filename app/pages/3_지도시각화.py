@@ -7,7 +7,7 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from utils.ui import load_css, render_sidebar, page_header, section_badge, info_card
 
 st.set_page_config(page_title="지도 시각화", layout="wide")

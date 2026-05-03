@@ -59,3 +59,24 @@ CREATE TABLE IF NOT EXISTS tbl_apart_deals (
     INDEX idx_deal_amount   (deal_amount)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='아파트 실거래가 원본 데이터 (5,002,839건)';
+
+
+-- -------------------------------------------------------------
+-- 시군구별 통계 테이블
+-- tbl_apart_deals에서 집계한 시군구 단위 요약 테이블.
+-- scripts/build_sigungu_stats.py 실행으로 생성/갱신합니다.
+-- 분류 모델 샘플 예측 UI에서 위도·경도·세대수 기본값으로 사용합니다.
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tbl_sigungu_stats (
+    sigungu          VARCHAR(100)    NOT NULL COMMENT '시군구 — 시/군/구 명칭 (원본 전체명)',
+    sido             VARCHAR(50)     NOT NULL COMMENT '시/도 — 지역코드 앞 2자리로 매핑한 광역시/도명',
+    region_code      INT             NOT NULL COMMENT '지역코드 — 행정구역 코드 (5자리), 오름차순 정렬 기준',
+    lat_median       DOUBLE          NOT NULL COMMENT '위도 중앙값 — 해당 시군구 거래 위도의 median',
+    lon_median       DOUBLE          NOT NULL COMMENT '경도 중앙값 — 해당 시군구 거래 경도의 median',
+    household_total  BIGINT          NOT NULL COMMENT '전체 세대수 — 시군구 합계 세대수',
+
+    PRIMARY KEY (sigungu),
+    INDEX idx_sido (sido),
+    INDEX idx_region_code (region_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='시군구별 통계 요약 (248개 시군구, build_sigungu_stats.py 생성)';
