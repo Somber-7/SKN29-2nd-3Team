@@ -7,6 +7,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from utils.db import get_connection
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
@@ -154,6 +155,7 @@ REQUIRED_FEATURES = [
     "브랜드여부",
 ]
 
+PYEONG_OPTIONS = {f"{p}평 ({round(p * 3.3058, 2)}㎡)": round(p * 3.3058, 2) for p in range(5, 101)}
 
 # =============================================================================
 # 모델 로드
@@ -177,7 +179,43 @@ def load_models():
 
 models = load_models()
 
+@st.cache_data
+def load_sigungu_options():
+    conn = get_connection()
 
+    try:
+        query = """
+        SELECT DISTINCT
+            sigungu,
+            region_code
+        FROM tbl_sigungu_stats
+        WHERE sigungu IS NOT NULL
+          AND region_code IS NOT NULL
+        ORDER BY sigungu
+        """
+
+        df = pd.read_sql(query, conn)
+
+    finally:
+        conn.close()
+
+    df["sigungu"] = df["sigungu"].astype(str).str.strip()
+    df["region_code"] = df["region_code"].astype(str).str.strip()
+
+    df = df.drop_duplicates(subset=["sigungu"])
+    df = df.sort_values("sigungu").reset_index(drop=True)
+
+    return df
+
+sigungu_df = load_sigungu_options()
+
+if sigungu_df.empty:
+    st.error("tbl_sigunggu_stats에서 시군구 목록을 불러오지 못했습니다.")
+    st.stop()
+
+sigungu_to_region_code = dict(
+    zip(sigungu_df["sigungu"], sigungu_df["region_code"])
+)
 # =============================================================================
 # 유틸 함수
 # =============================================================================
@@ -442,8 +480,7 @@ def render_prediction_card(predicted):
     st.markdown(f"""
     <div class="prediction-card">
         <div class="prediction-label">예측 거래금액</div>
-        <div class="prediction-value">{predicted:,.0f}만원</div>
-        <div class="prediction-sub">≈ {predicted / 10000:.2f}억원</div>
+        <div class="prediction-value">{predicted / 10000:.0f}억 {predicted % 10000:,.0f}만원</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -483,31 +520,33 @@ for tab, model_key in zip(tabs, available_model_keys):
             with st.form(key=f"predict_form_{model_key}"):
                 basic_col1, basic_col2 = st.columns(2)
 
-                with basic_col1:
-                    region_code = st.text_input(
-                        "지역코드",
-                        value="11680",
-                        help="예: 강남구 11680, 송파구 11710",
-                        key=f"region_code_{model_key}",
-                    )
+            with basic_col1:
+                selected_sigungu = st.selectbox(
+                    "시군구",
+                    options=sigungu_df["sigungu"].tolist(),
+                    index=0,
+                    key=f"sigungu_{model_key}",
+                )
 
-                    area = st.number_input(
-                        "전용면적 (㎡)",
-                        min_value=1.0,
-                        max_value=300.0,
-                        value=84.0,
-                        step=1.0,
-                        key=f"area_{model_key}",
-                    )
+                region_code = sigungu_to_region_code[selected_sigungu]
 
-                    built_year = st.number_input(
-                        "건축년도",
-                        min_value=1960,
-                        max_value=2030,
-                        value=2010,
-                        step=1,
-                        key=f"built_year_{model_key}",
-                    )
+                selected_area_label = st.selectbox(
+                    "전용면적",
+                    options=list(PYEONG_OPTIONS.keys()),
+                    index=20,
+                    key=f"area_label_{model_key}",
+                )
+
+                area = PYEONG_OPTIONS[selected_area_label]
+
+                built_year = st.number_input(
+                    "건축년도",
+                    min_value=1960,
+                    max_value=2030,
+                    value=2010,
+                    step=1,
+                    key=f"built_year_{model_key}",
+                )
 
                 with basic_col2:
                     deal_date = st.date_input(
@@ -602,11 +641,13 @@ for tab, model_key in zip(tabs, available_model_keys):
                         household_count=household_count,
                         brand_flag=brand_flag,
                     )
+                    display_input_df = input_df.copy()
+                    display_input_df.insert(0, "시군구", selected_sigungu)
 
                     predicted = predict_price(model, input_df)
 
                     st.session_state[prediction_state_key] = predicted
-                    st.session_state[input_state_key] = input_df
+                    st.session_state[input_state_key] = display_input_df
 
                 except Exception as e:
                     st.error("예측 중 오류가 발생했습니다.")
