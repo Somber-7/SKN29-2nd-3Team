@@ -260,13 +260,10 @@ class PricePremiumAnalyzer:
             premium_df.groupby(group_col, dropna=False)
             .agg(
                 거래건수=(self.target_col, "size"),
-                평균거래금액=(self.target_col, "mean"),
-                평균예측거래금액=("예측거래금액", "mean"),
                 평균프리미엄금액=("프리미엄금액", "mean"),
                 중앙값프리미엄금액=("프리미엄금액", "median"),
                 평균프리미엄률=("프리미엄률", "mean"),
                 중앙값프리미엄률=("프리미엄률", "median"),
-                평균평당가=("평당가", "mean"),
             )
             .reset_index()
         )
@@ -369,6 +366,7 @@ class PricePremiumAnalyzer:
 
 if __name__ == "__main__":
     import pandas as pd
+    from sklearn.model_selection import train_test_split
 
     try:
         from models.regression.price_regression_models import XGBoostPriceModel
@@ -376,16 +374,14 @@ if __name__ == "__main__":
         from price_regression_models import XGBoostPriceModel
 
     df = pd.read_csv("data/processed/Apart Deal_6.csv", encoding="utf-8", low_memory=False)
-    # df = df[df["시군구"].str.startswith("서울특별시", na=False)].copy()
-    df["거래연도"] = pd.to_datetime(df["거래일"]).dt.year
 
-    # 학습: 2015~2021 / 분석: 2022~2023
-    TRAIN_UNTIL = 2021
-    train_df = df[df["거래연도"] <= TRAIN_UNTIL]
-    analyze_df = df[df["거래연도"] > TRAIN_UNTIL]
+    # 동일 시장 내 랜덤 분할
+    # 목적: "미래 예측"이 아닌 "입지·브랜드 가치 대비 저평가/고평가 매물 분석"
+    # 모델이 같은 시장 조건의 적정가를 학습하므로, 프리미엄률이 그룹 간 상대적 가치를 정확히 반영함
+    train_df, analyze_df = train_test_split(df, test_size=0.2, random_state=42)
 
-    print(f"학습 데이터: {len(train_df):,}건 (2015~{TRAIN_UNTIL})")
-    print(f"분석 데이터: {len(analyze_df):,}건 ({TRAIN_UNTIL+1}~2023)")
+    print(f"학습 데이터: {len(train_df):,}건")
+    print(f"분석 데이터: {len(analyze_df):,}건")
 
     price_model = XGBoostPriceModel(sample_size=None, random_state=42)
     price_model.fit_from_dataframe(train_df)
