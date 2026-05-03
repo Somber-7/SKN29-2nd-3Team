@@ -331,17 +331,54 @@ class AnomalyTransactionModel:
 
 
 if __name__ == "__main__":
-    df = pd.read_csv("Apart Deal_6.csv", encoding="cp949")
+    import time
+    import pandas as pd
 
-    model = AnomalyTransactionModel(
-        contamination=0.03,
-        sample_size=200_000,
-        random_state=42,
-    )
+    print("=== 1. 데이터 불러오기 및 전처리 ===")
+    start_time = time.time()
+    
+    # 데이터 로드
+    df = pd.read_csv("../data/raw/Apart Deal_6.csv", encoding="utf-8", low_memory=False)
+    
+    # 평균 계산 에러 방지를 위해 거래금액을 순수 숫자로 변환
+    df["거래금액"] = df["거래금액"].astype(str).str.replace(",", "", regex=False).astype(float)
+    
+    # [핵심 추가] 중복 데이터 완벽 제거
+    before_count = len(df)
+    df = df.drop_duplicates(keep="first").reset_index(drop=True)
+    after_count = len(df)
+    
+    print(f"중복 제거 완료: {before_count:,}건 -> {after_count:,}건 (총 {before_count - after_count:,}건 중복 삭제됨)")
+    print(f"전처리 완료! - 소요시간: {time.time() - start_time:.2f}초")
 
-    model.fit_from_dataframe(df)
+    print("\n=== 2. 모델 학습 ===")
+    model = AnomalyTransactionModel()
+    
+   # 학습(fit)은 전체 데이터의 패턴을 파악하기에 충분한 20만 개만 무작위로 추출
+    train_df = df.sample(n=min(200000, len(df)), random_state=42)
+    model.fit_from_dataframe(train_df)
+    print("모델 학습 완료!")
 
-    print(model.summarize_anomalies(df))
-    print(model.top_anomalies(df, n=20))
+    print("\n=== 3. 전체 데이터 이상 거래 탐지 (Batch 처리) ===")
+    batch_size = 100000
+    result_list = []
 
-    model.save("anomaly_transaction_model.joblib")
+    for i in range(0, len(df), batch_size):
+        df_chunk = df.iloc[i : i + batch_size].copy()
+        print(f"  -> 배치 처리 중: [{i:,} ~ {i + len(df_chunk):,}] / {len(df):,}")
+        
+        # 조각난 데이터 탐지
+        chunk_result = model.detect_from_dataframe(df_chunk)
+        result_list.append(chunk_result)
+
+    print("\n=== 4. 결과 병합 및 최종 처리 ===")
+    final_result_df = pd.concat(result_list, ignore_index=True)
+
+    # 전체 데이터를 기준으로 진짜 순위(rank) 다시 계산
+    final_result_df["anomaly_rank"] = final_result_df["anomaly_score"].rank(method="first", ascending=True).astype(int)
+    print("최종 병합 및 순위 계산 완료!")
+
+    print("\n=== 5. 중복 제거된 진짜 특이 거래 TOP 10 ===")
+    top_anomalies = final_result_df[final_result_df["anomaly_raw_label"] == -1].sort_values("anomaly_score", ascending=True).head(10)
+    
+    print(top_anomalies[['시군구', '아파트', '거래금액', '전용면적', '층', '건축년도', 'anomaly_score', 'anomaly_rank']])
