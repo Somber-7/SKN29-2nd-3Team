@@ -135,8 +135,6 @@ class ApartmentPriceRegressionBase(BaseModel):
             "층",
             "건물연식",
             "기준금리",
-            "위도",
-            "경도",
             "인근학교수",
             "인근역수",
             "세대수",
@@ -172,8 +170,6 @@ class ApartmentPriceRegressionBase(BaseModel):
         # 추가 컬럼은 프로젝트에서 직접 만든 컬럼이므로, 없는 경우 0으로 채울 수 있게 별도 처리합니다.
         optional = [
             "기준금리",
-            "위도",
-            "경도",
             "인근학교수",
             "인근역수",
             "세대수",
@@ -221,7 +217,7 @@ class ApartmentPriceRegressionBase(BaseModel):
         data = df[use_cols].copy()
 
         # 프로젝트에서 추가한 컬럼이 아직 없는 상황에서도 테스트 가능하도록 기본값을 채웁니다.
-        for col in ["기준금리", "위도", "경도", "인근학교수", "인근역수", "세대수", "브랜드여부"]:
+        for col in ["기준금리", "인근학교수", "인근역수", "세대수", "브랜드여부"]:
             if col not in data.columns:
                 data[col] = 0
 
@@ -230,8 +226,6 @@ class ApartmentPriceRegressionBase(BaseModel):
             "층",
             "건축년도",
             "기준금리",
-            "위도",
-            "경도",
             "인근학교수",
             "인근역수",
             "세대수",
@@ -279,7 +273,7 @@ class ApartmentPriceRegressionBase(BaseModel):
             X["거래연도"] = 거래일.dt.year
             X["거래월"] = 거래일.dt.month
 
-        for col in ["기준금리", "위도", "경도", "인근학교수", "인근역수", "세대수", "브랜드여부"]:
+        for col in ["기준금리", "인근학교수", "인근역수", "세대수", "브랜드여부"]:
             if col not in X.columns:
                 X[col] = 0
 
@@ -498,6 +492,27 @@ class RandomForestPriceModel(ApartmentPriceRegressionBase):
 
     def _create_estimator(self):
         return RandomForestRegressor(**self.estimator_params)
+    
+    def get_feature_importance(self):
+        import pandas as pd
+
+        self._check_trained()
+
+        pipeline = self._model
+        preprocessor = pipeline.named_steps["preprocessor"]
+        rf_model = pipeline.named_steps["model"]
+
+        feature_names = preprocessor.get_feature_names_out()
+        importances = rf_model.feature_importances_
+
+        importance_df = pd.DataFrame({
+            "피처": feature_names,
+            "중요도": importances
+        })
+
+        importance_df = importance_df.sort_values("중요도", ascending=False).reset_index(drop=True)
+
+        return importance_df
 
 
 class LightGBMPriceModel(ApartmentPriceRegressionBase):
@@ -560,6 +575,27 @@ class XGBoostPriceModel(ApartmentPriceRegressionBase):
                 "XGBoostPriceModel을 사용하려면 `pip install xgboost`가 필요합니다."
             ) from exc
         return XGBRegressor(**self.estimator_params)
+    
+    def get_feature_importance(self):
+        import pandas as pd
+
+        self._check_trained()
+
+        pipeline = self._model
+        preprocessor = pipeline.named_steps["preprocessor"]
+        xgb_model = pipeline.named_steps["model"]
+
+        feature_names = preprocessor.get_feature_names_out()
+        importances = xgb_model.feature_importances_
+
+        importance_df = pd.DataFrame({
+            "피처": feature_names,
+            "중요도": importances
+        })
+
+        importance_df = importance_df.sort_values("중요도", ascending=False).reset_index(drop=True)
+
+        return importance_df
 
 
 # -----------------------------------------------------------------------------
