@@ -3,6 +3,7 @@
 import streamlit as st
 import sys
 import os
+import time
 import numpy as np
 import plotly.graph_objects as go
 
@@ -11,245 +12,299 @@ from utils.ui import (
     load_css, render_sidebar, page_header,
     section_badge, stat_card, chart_card_open, chart_card_close,
 )
+from utils.db import load_apart_deals
 
 st.set_page_config(page_title="신경망 (DNN)", layout="wide")
 load_css()
 render_sidebar()
 
-page_header("신경망 — DNN 모델 (PyTorch)")
+page_header("신경망 — DNN 거래금액 예측 (PyTorch)")
 
-tab_reg, tab_cls = st.tabs(["📊 회귀 (거래금액 예측)", "🏷️ 분류 (브랜드 등급)"])
+import json
 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+META_PATH    = os.path.join(PROJECT_ROOT, "data", "models", "dnn_regressor_meta.json")
 
-def make_loss_curve(epochs, final_train, final_val, noise=0.04):
-    """더미 학습 곡선 생성"""
-    np.random.seed(42)
-    x = np.arange(1, epochs + 1)
-    train_loss = final_train + (1.5 - final_train) * np.exp(-x / (epochs * 0.3))
-    train_loss += np.random.normal(0, noise, epochs)
-    val_loss = train_loss + np.random.uniform(0.02, 0.08, epochs)
-    val_loss = np.clip(val_loss, final_val, None)
-    return x, train_loss, val_loss
+# ── 전체 데이터 학습 결과 (고정)
+if os.path.exists(META_PATH):
+    with open(META_PATH, encoding="utf-8") as f:
+        meta = json.load(f)
 
+    section_badge("🏆", "전체 데이터 학습 결과 (사전 학습)")
+    st.caption(f"500만 건 전체 데이터 · 은닉층 {meta['config']['hidden_layers']}개 · 뉴런 {meta['config']['neurons']} · Dropout {meta['config']['dropout']} · BN · Early Stopping")
 
-# ══════════════════════════════
-# 회귀 탭
-# ══════════════════════════════
-with tab_reg:
-    col_left, col_right = st.columns([1, 2])
-
-    with col_left:
-        section_badge("🧠", "네트워크 구조 설정")
-
-        n_hidden   = st.slider("은닉층 수",       1, 6,    3,     key="reg_hidden")
-        n_neurons  = st.select_slider("층당 뉴런 수",
-                                      options=[64, 128, 256, 512], value=256, key="reg_neurons")
-        dropout    = st.slider("Dropout 비율",    0.0, 0.6, 0.3,  step=0.1, key="reg_drop")
-        lr         = st.select_slider("Learning Rate",
-                                      options=[0.1, 0.01, 0.001, 0.0001], value=0.001, key="reg_lr")
-        batch_size = st.select_slider("Batch Size",
-                                      options=[64, 128, 256, 512, 1024], value=256, key="reg_bs")
-        epochs     = st.slider("Epoch",          10, 200, 50, step=10, key="reg_ep")
-        use_bn     = st.checkbox("Batch Normalization 사용", value=True, key="reg_bn")
-        use_es     = st.checkbox("Early Stopping 사용",     value=True, key="reg_es")
-
-        # 네트워크 구조 미리보기
-        st.markdown("<br>", unsafe_allow_html=True)
-        layers = ["입력층"] + [f"Dense({n_neurons}) + ReLU" +
-                               (" + BN" if use_bn else "") +
-                               f" + Drop({dropout})" for _ in range(n_hidden)] + ["출력층(1)"]
-        st.markdown(
-            "<br>".join([f'<div style="font-size:12px;color:#6B7280;">{"→  " if i>0 else ""}{l}</div>'
-                         for i, l in enumerate(layers)]),
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        train_btn = st.button("학습 시작", type="primary",
-                              use_container_width=True, key="reg_train")
-
-    with col_right:
-        section_badge("📈", "학습 곡선")
-
-        # TODO: 실제 PyTorch 학습 연결
-        # ── 백엔드 연결 포인트 ──────────────────────────────
-        # from models.neural_network.dnn_regressor import DNNRegressor
-        # model = DNNRegressor(
-        #     hidden_layers=n_hidden, neurons=n_neurons,
-        #     dropout=dropout, use_bn=use_bn
-        # )
-        # history = model.fit(
-        #     X_train, y_train,
-        #     lr=lr, batch_size=batch_size, epochs=epochs,
-        #     early_stopping=use_es
-        # )
-        # train_losses = history["train_loss"]
-        # val_losses   = history["val_loss"]
-        # ────────────────────────────────────────────────────
-
-        x, train_loss, val_loss = make_loss_curve(epochs, 0.08, 0.11)
-
-        chart_card_open()
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=x, y=train_loss, mode="lines",
-            line=dict(color="#345BCB", width=2), name="Train Loss"))
-        fig.add_trace(go.Scatter(
-            x=x, y=val_loss, mode="lines",
-            line=dict(color="#F97316", width=2, dash="dot"), name="Val Loss"))
-        if use_es:
-            best_ep = int(np.argmin(val_loss)) + 1
-            fig.add_vline(x=best_ep, line_dash="dash", line_color="#10B981",
-                          annotation_text=f"Early Stop (ep={best_ep})")
-        fig.update_layout(
-            title="학습 / 검증 손실 (MSE Loss)",
-            xaxis_title="Epoch", yaxis_title="Loss",
-            height=340, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=40, b=0),
-            xaxis=dict(showgrid=True, gridcolor="#F0F4F8"),
-            yaxis=dict(showgrid=True, gridcolor="#F0F4F8"),
-        )
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── 성능 지표
-    section_badge("📊", "최종 성능 지표 (Test Set)")
-    # TODO: model.evaluate(X_test, y_test) 결과 연결
-    # from utils.metrics import regression_metrics
-    # metrics = regression_metrics(y_test, y_pred)
-    mc1, mc2, mc3 = st.columns(3)
-    mc1.markdown(stat_card("1,100만원", "MAE",  ""), unsafe_allow_html=True)
-    mc2.markdown(stat_card("1,700만원", "RMSE", ""), unsafe_allow_html=True)
-    mc3.markdown(stat_card("0.91",      "R²",   ""), unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── 예측 vs 실제
-    section_badge("🎯", "예측 결과 시각화", color="#F97316")
-    chart_card_open()
-    # TODO: plot_prediction_vs_actual(y_test, y_pred) 교체
-    np.random.seed(7)
-    y_t = np.random.randint(30000, 150000, 300).astype(float)
-    y_p = y_t + np.random.normal(0, 1100, 300)
-    fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(
-        x=y_t, y=y_p, mode="markers",
-        marker=dict(color="#345BCB", opacity=0.45, size=5), name="예측"))
-    fig2.add_trace(go.Scatter(
-        x=[30000, 150000], y=[30000, 150000], mode="lines",
-        line=dict(color="#EF4444", dash="dash", width=1.5), name="y=x"))
-    fig2.update_layout(
-        xaxis_title="실제(만원)", yaxis_title="예측(만원)",
-        height=300, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=0, r=0, t=10, b=0),
-        xaxis=dict(showgrid=True, gridcolor="#F0F4F8"),
-        yaxis=dict(showgrid=True, gridcolor="#F0F4F8"),
-    )
-    st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
-    chart_card_close()
-
-
-# ══════════════════════════════
-# 분류 탭
-# ══════════════════════════════
-with tab_cls:
-    col_left, col_right = st.columns([1, 2])
-
-    with col_left:
-        section_badge("🧠", "네트워크 구조 설정")
-
-        n_hidden_c  = st.slider("은닉층 수",      1, 6,    3,    key="cls_hidden")
-        n_neurons_c = st.select_slider("층당 뉴런 수",
-                                       options=[64, 128, 256, 512], value=256, key="cls_neurons")
-        dropout_c   = st.slider("Dropout 비율",   0.0, 0.6, 0.3, step=0.1, key="cls_drop")
-        lr_c        = st.select_slider("Learning Rate",
-                                       options=[0.1, 0.01, 0.001, 0.0001], value=0.001, key="cls_lr")
-        epochs_c    = st.slider("Epoch",         10, 200, 50, step=10, key="cls_ep")
-        use_bn_c    = st.checkbox("Batch Normalization", value=True,  key="cls_bn")
-        use_es_c    = st.checkbox("Early Stopping",      value=True,  key="cls_es")
-        pos_weight  = st.slider("pos_weight (불균형 조정)", 1.0, 10.0, 3.0, step=0.5, key="cls_pw")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        train_btn_c = st.button("학습 시작", type="primary",
-                                use_container_width=True, key="cls_train")
-
-    with col_right:
-        section_badge("📈", "학습 곡선")
-
-        # TODO: DNN 분류 모델 학습 연결
-        # ── 백엔드 연결 포인트 ──────────────────────────────
-        # from models.neural_network.dnn_classifier import DNNClassifier
-        # model = DNNClassifier(
-        #     hidden_layers=n_hidden_c, neurons=n_neurons_c,
-        #     dropout=dropout_c, use_bn=use_bn_c
-        # )
-        # criterion = torch.nn.CrossEntropyLoss()
-        # history = model.fit(
-        #     X_train, y_train,
-        #     lr=lr_c, epochs=epochs_c,
-        #     early_stopping=use_es_c
-        # )
-        # ────────────────────────────────────────────────────
-
-        xc, tl_c, vl_c = make_loss_curve(epochs_c, 0.25, 0.32, noise=0.015)
-
-        chart_card_open()
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=xc, y=tl_c, mode="lines",
-            line=dict(color="#345BCB", width=2), name="Train Loss"))
-        fig.add_trace(go.Scatter(
-            x=xc, y=vl_c, mode="lines",
-            line=dict(color="#F97316", width=2, dash="dot"), name="Val Loss"))
-        if use_es_c:
-            best_c = int(np.argmin(vl_c)) + 1
-            fig.add_vline(x=best_c, line_dash="dash", line_color="#10B981",
-                          annotation_text=f"Early Stop (ep={best_c})")
-        fig.update_layout(
-            title="학습 / 검증 손실 (Cross Entropy)",
-            xaxis_title="Epoch", yaxis_title="Loss",
-            height=340, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=40, b=0),
-            xaxis=dict(showgrid=True, gridcolor="#F0F4F8"),
-            yaxis=dict(showgrid=True, gridcolor="#F0F4F8"),
-        )
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── 성능 지표
-    section_badge("📊", "최종 성능 지표 (Test Set)")
-    # TODO: classification_metrics(y_test, y_pred, y_prob) 결과 연결
     mc1, mc2, mc3, mc4 = st.columns(4)
-    mc1.markdown(stat_card("0.90", "Accuracy",  ""), unsafe_allow_html=True)
-    mc2.markdown(stat_card("0.89", "Precision", ""), unsafe_allow_html=True)
-    mc3.markdown(stat_card("0.88", "Recall",    ""), unsafe_allow_html=True)
-    mc4.markdown(stat_card("0.95", "AUC",       ""), unsafe_allow_html=True)
+    mc1.markdown(stat_card(f"{meta['metrics']['MAE']:,.0f}만원",  "MAE",      ""),                                   unsafe_allow_html=True)
+    mc2.markdown(stat_card(f"{meta['metrics']['RMSE']:,.0f}만원", "RMSE",     ""),                                   unsafe_allow_html=True)
+    mc3.markdown(stat_card(f"{meta['metrics']['R2']:.4f}",        "R²",       ""),                                   unsafe_allow_html=True)
+    mc4.markdown(stat_card(f"{meta['elapsed']:.0f}초",            "학습 시간", f"샘플 {meta['sample_size']:,}건"),   unsafe_allow_html=True)
+
+    chart_card_open()
+    x = list(range(1, len(meta["train_losses"]) + 1))
+    fig0 = go.Figure()
+    fig0.add_trace(go.Scatter(x=x, y=meta["train_losses"], mode="lines",
+                               line=dict(color="#345BCB", width=2), name="Train Loss"))
+    fig0.add_trace(go.Scatter(x=x, y=meta["val_losses"],   mode="lines",
+                               line=dict(color="#F97316", width=2, dash="dot"), name="Val Loss"))
+    if meta["best_epoch"] < len(x):
+        fig0.add_vline(x=meta["best_epoch"], line_dash="dash", line_color="#10B981",
+                       annotation_text=f"Best (ep={meta['best_epoch']})")
+    fig0.update_layout(
+        height=260, margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(title="Epoch", showgrid=True, gridcolor="#F0F4F8"),
+        yaxis=dict(title="Loss (MSE)", showgrid=True, gridcolor="#F0F4F8"),
+        legend=dict(orientation="h", y=1.05),
+    )
+    st.plotly_chart(fig0, use_container_width=True)
+    chart_card_close()
+
+    st.divider()
+
+@st.cache_data(show_spinner="데이터 로딩 중...", ttl=3600)
+def get_df():
+    import pandas as pd
+    df = load_apart_deals()
+    df["거래일"]  = pd.to_datetime(df["거래일"])
+    df["거래금액"] = pd.to_numeric(df["거래금액"], errors="coerce")
+    return df.dropna(subset=["거래금액"])
+
+
+col_left, col_right = st.columns([1, 2])
+
+# ── 좌측: 하이퍼파라미터 설정
+with col_left:
+    section_badge("🧠", "네트워크 구조 설정")
+
+    n_hidden   = st.slider("은닉층 수",    1, 6,   3)
+    n_neurons  = st.select_slider("층당 뉴런 수",
+                                   options=[64, 128, 256, 512], value=256)
+    dropout    = st.slider("Dropout 비율", 0.0, 0.5, 0.3, step=0.1)
+    lr         = st.select_slider("Learning Rate",
+                                   options=[0.1, 0.01, 0.001, 0.0001], value=0.001)
+    batch_size = st.select_slider("Batch Size",
+                                   options=[128, 256, 512, 1024], value=256)
+    epochs     = st.slider("Epoch", 5, 100, 30, step=5)
+    use_bn     = st.checkbox("Batch Normalization", value=True)
+    use_es     = st.checkbox("Early Stopping (patience=5)", value=True)
+    sample_k   = st.select_slider("학습 샘플 수",
+                                   options=[10_000, 30_000, 50_000, 100_000, 200_000],
+                                   value=50_000,
+                                   format_func=lambda x: f"{x:,}건")
+
+    # 네트워크 구조 미리보기
+    st.markdown("<br>", unsafe_allow_html=True)
+    layer_lines = ["입력층 (수치+범주형 피처)"]
+    for i in range(n_hidden):
+        line = f"Dense({n_neurons}) → ReLU"
+        if use_bn:   line += " → BN"
+        if dropout:  line += f" → Drop({dropout})"
+        layer_lines.append(line)
+    layer_lines.append("출력층 (거래금액, 만원)")
+    st.markdown(
+        "".join([
+            f'<div style="font-size:12px;color:#6B7280;margin:2px 0;">{"↓  " if i>0 else "   "}{l}</div>'
+            for i, l in enumerate(layer_lines)
+        ]),
+        unsafe_allow_html=True,
+    )
 
     st.markdown("<br>", unsafe_allow_html=True)
+    train_btn = st.button("🚀 학습 시작", type="primary", use_container_width=True)
 
-    # ── 혼동 행렬
-    section_badge("🎯", "혼동 행렬", color="#F97316")
-    import plotly.figure_factory as ff
-    GRADE_LABELS = ["프리미엄", "일반브랜드", "공공(LH)", "기타"]
-    # TODO: get_confusion_matrix(y_test, y_pred) 연결
-    dummy_cm = [[370, 15, 4, 11], [18, 220, 2, 8], [4, 1, 230, 3], [12, 8, 2, 388]]
-    chart_card_open()
-    fig_cm = ff.create_annotated_heatmap(
-        z=dummy_cm,
-        x=GRADE_LABELS, y=GRADE_LABELS,
-        colorscale=[[0, "#EFF6FF"], [1, "#1D4ED8"]],
-        showscale=False,
-    )
-    fig_cm.update_layout(
-        title="혼동 행렬", height=320,
-        paper_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=0, r=0, t=40, b=0),
-        xaxis=dict(title="예측"),
-        yaxis=dict(title="실제", autorange="reversed"),
-    )
-    st.plotly_chart(fig_cm, use_container_width=True, config={"displayModeBar": False})
-    chart_card_close()
+# ── 우측: 학습 결과
+with col_right:
+    section_badge("📈", "학습 현황")
+
+    if train_btn:
+        df = get_df()
+
+        # session_state 초기화
+        st.session_state.pop("dnn_result", None)
+
+        from models.regression.dnn_regressor import DNNRegressorModel
+
+        model = DNNRegressorModel(
+            hidden_layers=n_hidden,
+            neurons=n_neurons,
+            dropout=dropout,
+            lr=lr,
+            batch_size=batch_size,
+            epochs=epochs,
+            use_bn=use_bn,
+            early_stopping=use_es,
+            patience=5,
+            sample_size=sample_k,
+        )
+
+        # 진행 상황 표시
+        progress_bar  = st.progress(0.0, text="학습 준비 중...")
+        status_text   = st.empty()
+        chart_placeholder = st.empty()
+
+        train_losses, val_losses = [], []
+        t_start = time.time()
+
+        def on_progress(epoch, total, tl, vl):
+            train_losses.append(tl)
+            val_losses.append(vl)
+            pct = epoch / total
+            elapsed = time.time() - t_start
+            eta     = (elapsed / epoch) * (total - epoch) if epoch > 0 else 0
+            progress_bar.progress(pct, text=f"Epoch {epoch}/{total}  |  train loss: {tl:.4f}  |  val loss: {vl:.4f}  |  ETA: {eta:.0f}s")
+
+            # 실시간 차트 (5 epoch마다 갱신)
+            if epoch % 5 == 0 or epoch == total:
+                fig = go.Figure()
+                x = list(range(1, len(train_losses) + 1))
+                fig.add_trace(go.Scatter(x=x, y=train_losses, mode="lines",
+                                         line=dict(color="#345BCB", width=2), name="Train Loss"))
+                fig.add_trace(go.Scatter(x=x, y=val_losses,   mode="lines",
+                                         line=dict(color="#F97316", width=2, dash="dot"), name="Val Loss"))
+                fig.update_layout(
+                    height=300, margin=dict(l=0, r=0, t=10, b=0),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    xaxis=dict(title="Epoch", showgrid=True, gridcolor="#F0F4F8"),
+                    yaxis=dict(title="Loss (MSE)", showgrid=True, gridcolor="#F0F4F8"),
+                    legend=dict(orientation="h", y=1.05),
+                )
+                chart_placeholder.plotly_chart(fig, use_container_width=True)
+
+        with st.spinner(""):
+            model.fit_from_dataframe(df, progress_callback=on_progress)
+
+        progress_bar.progress(1.0, text=f"✅ 학습 완료! ({model.elapsed_:.1f}초)")
+
+        # Early Stop 표시
+        if use_es and model.best_epoch_ < epochs:
+            status_text.info(f"Early Stopping: epoch {model.best_epoch_}에서 최적 모델 저장")
+
+        # 최종 차트 (early stop 라인 포함)
+        fig_final = go.Figure()
+        x = list(range(1, len(model.train_losses_) + 1))
+        fig_final.add_trace(go.Scatter(x=x, y=model.train_losses_, mode="lines",
+                                        line=dict(color="#345BCB", width=2), name="Train Loss"))
+        fig_final.add_trace(go.Scatter(x=x, y=model.val_losses_,   mode="lines",
+                                        line=dict(color="#F97316", width=2, dash="dot"), name="Val Loss"))
+        if use_es and model.best_epoch_ < len(x):
+            fig_final.add_vline(x=model.best_epoch_, line_dash="dash", line_color="#10B981",
+                                 annotation_text=f"Best (ep={model.best_epoch_})")
+        fig_final.update_layout(
+            height=300, margin=dict(l=0, r=0, t=10, b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(title="Epoch", showgrid=True, gridcolor="#F0F4F8"),
+            yaxis=dict(title="Loss (MSE)", showgrid=True, gridcolor="#F0F4F8"),
+            legend=dict(orientation="h", y=1.05),
+        )
+        chart_placeholder.plotly_chart(fig_final, use_container_width=True)
+
+        st.session_state["dnn_result"] = model
+
+    elif "dnn_result" in st.session_state:
+        model = st.session_state["dnn_result"]
+        x = list(range(1, len(model.train_losses_) + 1))
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=x, y=model.train_losses_, mode="lines",
+                                  line=dict(color="#345BCB", width=2), name="Train Loss"))
+        fig.add_trace(go.Scatter(x=x, y=model.val_losses_,   mode="lines",
+                                  line=dict(color="#F97316", width=2, dash="dot"), name="Val Loss"))
+        if use_es and model.best_epoch_ < len(x):
+            fig.add_vline(x=model.best_epoch_, line_dash="dash", line_color="#10B981",
+                           annotation_text=f"Best (ep={model.best_epoch_})")
+        fig.update_layout(
+            height=300, margin=dict(l=0, r=0, t=10, b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(title="Epoch", showgrid=True, gridcolor="#F0F4F8"),
+            yaxis=dict(title="Loss (MSE)", showgrid=True, gridcolor="#F0F4F8"),
+            legend=dict(orientation="h", y=1.05),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("좌측에서 하이퍼파라미터를 설정하고 학습 시작 버튼을 눌러주세요.")
+
+# ── 성능 지표 + 예측 (학습 완료 후)
+if "dnn_result" in st.session_state:
+    model = st.session_state["dnn_result"]
+    m = model.metrics_
+
+    st.divider()
+    section_badge("📊", "최종 성능 지표 (Validation Set)")
+    mc1, mc2, mc3, mc4 = st.columns(4)
+    mc1.markdown(stat_card(f"{m['MAE']:,.0f}만원", "MAE",  ""),  unsafe_allow_html=True)
+    mc2.markdown(stat_card(f"{m['RMSE']:,.0f}만원","RMSE", ""),  unsafe_allow_html=True)
+    mc3.markdown(stat_card(f"{m['R2']:.4f}",       "R²",   ""),  unsafe_allow_html=True)
+    mc4.markdown(stat_card(f"{model.elapsed_:.1f}초", "학습 시간", f"샘플 {sample_k:,}건"), unsafe_allow_html=True)
+
+    st.divider()
+    section_badge("🔮", "거래금액 예측 — 내 모델 vs 사전학습 모델", color="#F97316")
+
+    import pandas as pd
+    from models.regression.dnn_regressor import DNNRegressorModel as _DNN
+
+    MODEL_PT = os.path.join(PROJECT_ROOT, "data", "models", "dnn_regressor.pt")
+
+    p1, p2, p3 = st.columns(3)
+    with p1:
+        p_area      = st.number_input("전용면적 (㎡)", 10.0, 300.0, 84.0, step=1.0)
+        p_floor     = st.number_input("층", 1, 80, 15)
+        p_built     = st.number_input("건축년도", 1980, 2025, 2015)
+        p_region    = st.text_input("지역코드", "11680", help="강남구: 11680")
+    with p2:
+        p_rate      = st.number_input("기준금리", 0.0, 10.0, 3.5, step=0.25)
+        p_school    = st.number_input("인근학교수", 0, 20, 3)
+        p_station   = st.number_input("인근역수",  0, 20, 2)
+    with p3:
+        p_household = st.number_input("세대수", 0, 10000, 1000, step=50)
+        p_brand     = st.radio("브랜드여부", [0, 1],
+                                format_func=lambda x: "비브랜드" if x == 0 else "브랜드",
+                                horizontal=True)
+        p_date      = st.date_input("거래일", value=pd.Timestamp("2023-01-01"))
+
+    if st.button("예측하기", type="primary"):
+        input_df = pd.DataFrame([{
+            "전용면적": p_area, "층": p_floor, "건축년도": p_built,
+            "지역코드": str(p_region), "거래일": pd.Timestamp(p_date),
+            "기준금리": p_rate, "인근학교수": p_school,
+            "인근역수": p_station, "세대수": p_household, "브랜드여부": p_brand,
+        }])
+
+        res_col1, res_col2 = st.columns(2)
+
+        # 내 모델 예측
+        with res_col1:
+            try:
+                prepared = model.prepare_dataframe(input_df, need_target=False)
+                pred_my  = model.predict_single(prepared[model.feature_columns])
+                st.markdown(f"""
+                <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:20px;text-align:center;">
+                    <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">내 모델 예측</div>
+                    <div style="font-size:13px;color:#64748B;margin-bottom:4px;">(샘플 {sample_k:,}건 · {n_hidden}층 · {n_neurons}뉴런)</div>
+                    <div style="font-size:32px;font-weight:800;color:#1D4ED8;">{pred_my:,.0f}만원</div>
+                    <div style="font-size:14px;color:#9CA3AF;margin-top:4px;">≈ {pred_my/10000:.2f}억원</div>
+                </div>
+                """, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"내 모델 오류: {e}")
+
+        # 사전학습 모델 예측
+        with res_col2:
+            if os.path.exists(MODEL_PT):
+                try:
+                    pretrained = _DNN.load(MODEL_PT)
+                    prepared2  = pretrained.prepare_dataframe(input_df, need_target=False)
+                    pred_pre   = pretrained.predict_single(prepared2[pretrained.feature_columns])
+                    diff       = pred_my - pred_pre
+                    diff_str   = f"{'▲' if diff > 0 else '▼'} {abs(diff):,.0f}만원 {'높음' if diff > 0 else '낮음'}"
+                    st.markdown(f"""
+                    <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:20px;text-align:center;">
+                        <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">사전학습 모델 예측</div>
+                        <div style="font-size:13px;color:#64748B;margin-bottom:4px;">(500만 건 · 4층 · 256뉴런)</div>
+                        <div style="font-size:32px;font-weight:800;color:#15803D;">{pred_pre:,.0f}만원</div>
+                        <div style="font-size:14px;color:#9CA3AF;margin-top:4px;">≈ {pred_pre/10000:.2f}억원</div>
+                        <div style="font-size:13px;color:#6B7280;margin-top:6px;">내 모델 대비 {diff_str}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"사전학습 모델 오류: {e}")
+            else:
+                st.warning("사전학습 모델 파일이 없습니다. (scripts/train_dnn.py 실행 필요)")
