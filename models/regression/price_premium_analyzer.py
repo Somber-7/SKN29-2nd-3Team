@@ -366,7 +366,6 @@ class PricePremiumAnalyzer:
 
 if __name__ == "__main__":
     import pandas as pd
-    from sklearn.model_selection import train_test_split
 
     try:
         from models.regression.price_regression_models import XGBoostPriceModel
@@ -375,19 +374,22 @@ if __name__ == "__main__":
 
     df = pd.read_csv("data/processed/Apart Deal_6.csv", encoding="utf-8", low_memory=False)
 
-    # 동일 시장 내 랜덤 분할
-    # 목적: "미래 예측"이 아닌 "입지·브랜드 가치 대비 저평가/고평가 매물 분석"
-    # 모델이 같은 시장 조건의 적정가를 학습하므로, 프리미엄률이 그룹 간 상대적 가치를 정확히 반영함
-    train_df, analyze_df = train_test_split(df, test_size=0.2, random_state=42)
+    print(f"전체 데이터: {len(df):,}건")
 
-    print(f"학습 데이터: {len(train_df):,}건")
-    print(f"분석 데이터: {len(analyze_df):,}건")
-
-    price_model = XGBoostPriceModel(sample_size=None, random_state=42)
-    price_model.fit_from_dataframe(train_df)
+    # 역세권·학세권·브랜드를 프리미엄 분석 대상으로 보기 위해 모델 피처에서 제외
+    # → 모델이 이 요소들을 모르는 상태에서 적정가를 계산 → 잔차가 해당 요소의 순수 프리미엄을 반영
+    PREMIUM_NUMERIC_COLS = [
+        "전용면적", "층", "건물연식", "기준금리", "세대수", "거래연도", "거래월",
+    ]
+    price_model = XGBoostPriceModel(
+        sample_size=200_000,
+        random_state=42,
+        numeric_cols=PREMIUM_NUMERIC_COLS,
+    )
+    price_model.fit_from_dataframe(df)
 
     analyzer = PricePremiumAnalyzer(price_model=price_model)
-    premium_df = analyzer.analyze(analyze_df)
+    premium_df = analyzer.analyze(df)
 
     print("\n[모델 성능]")
     print(analyzer.evaluate_price_model(premium_df))

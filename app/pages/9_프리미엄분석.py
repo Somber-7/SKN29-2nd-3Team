@@ -6,7 +6,6 @@ import os
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from sklearn.model_selection import train_test_split
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
@@ -104,13 +103,21 @@ def load_data():
 @st.cache_data(show_spinner="적정가 모델 학습 및 프리미엄 분석 중... (최초 1회, 약 1~2분 소요)")
 def run_analysis():
     df = load_data()
-    train_df, analyze_df = train_test_split(df, test_size=0.2, random_state=42)
 
-    price_model = XGBoostPriceModel(sample_size=200_000, random_state=42)
-    price_model.fit_from_dataframe(train_df)
+    # 역세권·학세권·브랜드를 프리미엄 분석 대상으로 보기 위해 모델 피처에서 제외
+    # → 모델이 이 요소들을 모르는 상태에서 적정가를 계산 → 잔차가 해당 요소의 순수 프리미엄을 반영
+    PREMIUM_NUMERIC_COLS = [
+        "전용면적", "층", "건물연식", "기준금리", "세대수", "거래연도", "거래월",
+    ]
+    price_model = XGBoostPriceModel(
+        sample_size=200_000,
+        random_state=42,
+        numeric_cols=PREMIUM_NUMERIC_COLS,
+    )
+    price_model.fit_from_dataframe(df)
 
     analyzer = PricePremiumAnalyzer(price_model=price_model)
-    premium_df = analyzer.analyze(analyze_df)
+    premium_df = analyzer.analyze(df)
 
     metrics = analyzer.evaluate_price_model(premium_df)
 
