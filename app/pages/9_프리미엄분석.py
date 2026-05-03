@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from utils.ui import load_css, render_sidebar, page_header, section_badge
+from utils.db import load_apart_deals
 from models.regression.price_regression_models import XGBoostPriceModel
 from models.regression.price_premium_analyzer import PricePremiumAnalyzer
 
@@ -74,7 +75,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DATA_PATH = os.path.join(PROJECT_ROOT, "data", "processed", "Apart Deal_6.csv")
 
 GRADE_ORDER  = ["큰 할인", "할인", "보통", "프리미엄", "고프리미엄"]
 GRADE_COLORS = {
@@ -98,7 +98,7 @@ GROUP_COLS = [
 
 @st.cache_data(show_spinner="데이터 로딩 중...")
 def load_data():
-    return pd.read_csv(DATA_PATH, encoding="utf-8", low_memory=False)
+    return load_apart_deals()
 
 
 @st.cache_data(show_spinner="적정가 모델 학습 및 프리미엄 분석 중... (최초 1회, 약 1~2분 소요)")
