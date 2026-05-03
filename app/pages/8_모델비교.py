@@ -25,7 +25,7 @@ page_header("모델 비교 — 회귀 / 분류 성능 비교")
 # df_reg = pd.DataFrame(rows)
 # ────────────────────────────────────────────────────
 
-# 더미 회귀 성능
+# 회귀 성능 (하드코딩 되어있지만 실제 결과임)
 REG_DATA = pd.DataFrame({
     "모델":      ["Linear", "RandomForest", "LightGBM", "XGBoost"],
     "MAE":       [8692,      4106,           4020,       3976],
