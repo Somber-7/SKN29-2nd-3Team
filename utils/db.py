@@ -200,9 +200,9 @@ def load_apart_deals(
 
     if use_cache and is_full_load:
         if _CACHE_PATH.exists():
-            print(f"[cache] Parquet 캐시 로딩 — {_CACHE_PATH}")
+            print(f"[cache] Parquet 캐시 로딩: {_CACHE_PATH}")
             return pd.read_parquet(_CACHE_PATH)
-        print("[cache] 캐시 없음 — DB에서 전체 로딩 후 저장합니다.")
+        print("[cache] 캐시 없음 - DB에서 전체 로딩 후 저장합니다.")
 
     conditions = []
     params = []
@@ -231,6 +231,6 @@ def load_apart_deals(
     if use_cache and is_full_load:
         _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
         df.to_parquet(_CACHE_PATH, index=False)
-        print(f"[cache] Parquet 캐시 저장 완료 — {_CACHE_PATH}")
+        print(f"[cache] Parquet 캐시 저장 완료: {_CACHE_PATH}")
 
     return df

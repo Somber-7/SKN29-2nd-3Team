@@ -35,6 +35,7 @@ def render_sidebar():
         st.page_link("pages/7_신경망.py",       label="🧠  신경망 (DNN)")
         st.page_link("pages/8_모델비교.py",     label="📋  모델 비교")
         st.page_link("pages/9_프리미엄분석.py", label="💡  저·고평가 분석")
+        st.page_link("pages/10_이상치분석.py", label="🔴  이상치 분석")
 
 
 def page_header(title: str):

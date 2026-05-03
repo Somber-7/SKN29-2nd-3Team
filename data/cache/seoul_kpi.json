@@ -1,0 +1,8 @@
+{
+  "total_count": 606800,
+  "anomaly_count": 18216,
+  "normal_count": 588584,
+  "anomaly_ratio": 0.03001977587343441,
+  "avg_ppy_normal": 2729.683594070192,
+  "avg_ppy_anomaly": 4750.046024545527
+}
