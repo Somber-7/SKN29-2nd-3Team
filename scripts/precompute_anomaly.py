@@ -75,7 +75,7 @@ def run_anomaly(df: pd.DataFrame) -> None:
     print("\n[1/3] 전국 단일 모델 (AnomalyTransactionModel)")
     t = time.time()
 
-    df_fit = _sort_df(df)
+    df_fit = df
     model = AnomalyTransactionModel(contamination=0.03, sample_size=200_000, random_state=42)
     model.fit_from_dataframe(df_fit)
     print(f"  학습 완료 ({time.time()-t:.0f}초)")
@@ -111,7 +111,7 @@ def run_anomaly(df: pd.DataFrame) -> None:
         json.dump(summary, f, ensure_ascii=False, indent=2)
 
     # ── TOP 30 테이블
-    top30 = result[anomaly_mask].head(30).reset_index(drop=True)
+    top30 = result[anomaly_mask].sort_values("anomaly_score").head(30).reset_index(drop=True)
     top30.to_parquet(CACHE_DIR / "anomaly_top30.parquet", index=False)
 
     # ── 지역별 특이거래 건수 TOP 20
@@ -154,17 +154,44 @@ def run_seoul(df: pd.DataFrame) -> None:
     print("\n[2/3] 서울 구별 모델 (SeoulDistrictAnomalyModel)")
     t = time.time()
 
-    df_fit = _sort_df(df)
+    df_fit = df
     model = SeoulDistrictAnomalyModel(contamination=0.03, random_state=42)
     model.fit_from_dataframe(df_fit)
     print(f"  학습 완료 ({time.time()-t:.0f}초)")
 
-    result          = model.detect_from_dataframe(df_fit)
-    summary         = model.summarize_by_district(df_fit)
-    top_by_district = model.top_anomalies_by_district(df_fit, n=10)
-
+    result       = model.detect_from_dataframe(df_fit)
     anomaly_mask = result["anomaly_raw_label"] == -1
     normal_mask  = result["anomaly_raw_label"] == 1
+
+    # summarize_by_district / top_anomalies_by_district 결과를 result에서 직접 도출 (재탐지 방지)
+    result_notna = result[result["anomaly_raw_label"].notna()]
+    rows = []
+    for district, group in result_notna.groupby("구명"):
+        anomaly = group[group["anomaly_raw_label"] == -1]
+        normal  = group[group["anomaly_raw_label"] == 1]
+        total   = len(group)
+        ac      = len(anomaly)
+        rows.append({
+            "구명": district,
+            "총거래수": total,
+            "특이거래수": ac,
+            "특이거래비율(%)": round(ac / total * 100, 2) if total else 0.0,
+            "정상거래_평균평당가": round(float(normal["평당가"].mean()), 0) if len(normal) else np.nan,
+            "특이거래_평균평당가": round(float(anomaly["평당가"].mean()), 0) if ac else np.nan,
+            "평균평당가_차이": round(float(anomaly["평당가"].mean() - normal["평당가"].mean()), 0) if (ac and len(normal)) else np.nan,
+            "특이거래_평균거래금액": round(float(anomaly["거래금액"].mean()), 0) if ac else np.nan,
+            "특이거래_최저score": round(float(anomaly["anomaly_score"].min()), 4) if ac else np.nan,
+        })
+    summary = pd.DataFrame(rows).set_index("구명").sort_values("특이거래비율(%)", ascending=False)
+
+    top_by_district = (
+        result[anomaly_mask]
+        .sort_values("anomaly_score", ascending=True)
+        .groupby("구명", group_keys=False)
+        .head(10)
+        .sort_values(["구명", "anomaly_score"])
+        .reset_index(drop=True)
+    )
 
     kpi = {
         "total_count":     int(len(result)),
@@ -191,17 +218,45 @@ def run_location(df: pd.DataFrame) -> None:
     print("\n[3/3] 전국 시군구별 모델 (LocationAnomalyModel)")
     t = time.time()
 
-    df_fit = _sort_df(df)
+    df_fit = df
     model = LocationAnomalyModel(contamination=0.03, random_state=42)
     model.fit_from_dataframe(df_fit)
     print(f"  학습 완료 ({time.time()-t:.0f}초)")
 
-    result  = model.detect_from_dataframe(df_fit)
-    summary = model.summarize_by_location(df_fit)
-    top10   = model.top_anomalies_top1_per_region(df_fit, n=10)
-
-    anomaly_mask = result["anomaly_raw_label"] == -1
+    result        = model.detect_from_dataframe(df_fit)
+    anomaly_mask  = result["anomaly_raw_label"] == -1
     detected_mask = result["anomaly_raw_label"].notna()
+
+    # summarize_by_location / top_anomalies_top1_per_region 결과를 result에서 직접 도출 (재탐지 방지)
+    result_notna = result[result["anomaly_raw_label"].notna()]
+    rows = []
+    for sigungu, group in result_notna.groupby("시군구"):
+        anomaly = group[group["anomaly_raw_label"] == -1]
+        normal  = group[group["anomaly_raw_label"] == 1]
+        total   = len(group)
+        ac      = len(anomaly)
+        rows.append({
+            "시군구": sigungu,
+            "총거래수": total,
+            "특이거래수": ac,
+            "특이거래비율(%)": round(ac / total * 100, 2) if total else 0.0,
+            "정상거래_평균평당가": round(float(normal["평당가"].mean()), 0) if len(normal) else np.nan,
+            "특이거래_평균평당가": round(float(anomaly["평당가"].mean()), 0) if ac else np.nan,
+            "평균평당가_차이": round(float(anomaly["평당가"].mean() - normal["평당가"].mean()), 0) if (ac and len(normal)) else np.nan,
+            "특이거래_평균거래금액": round(float(anomaly["거래금액"].mean()), 0) if ac else np.nan,
+            "특이거래_최저score": round(float(anomaly["anomaly_score"].min()), 4) if ac else np.nan,
+        })
+    summary = pd.DataFrame(rows).set_index("시군구").sort_values("특이거래비율(%)", ascending=False)
+
+    top10 = (
+        result[anomaly_mask]
+        .sort_values("anomaly_score", ascending=True)
+        .groupby("시군구", group_keys=False)
+        .head(1)
+        .sort_values("anomaly_score", ascending=True)
+        .head(10)
+        .reset_index(drop=True)
+    )
 
     best_score = float(top10["anomaly_score"].min()) if len(top10) > 0 else float("nan")
 
@@ -243,6 +298,7 @@ if __name__ == "__main__":
     print("\n데이터 로드 중...")
     df = load_data()
     print(f"  로드 완료: {len(df):,}건")
+    df = _sort_df(df)
 
     run_anomaly(df)
     run_seoul(df)

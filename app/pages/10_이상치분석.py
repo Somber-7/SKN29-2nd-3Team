@@ -345,7 +345,7 @@ with tab2:
                 x=ppy_sorted[x_gu],
                 y=ppy_sorted["평균평당가_차이"],
                 marker_color="#F97316",
-                text=ppy_sorted["평균평당가_차이"].apply(lambda x: f"+{x:,.0f}만원"),
+                text=ppy_sorted["평균평당가_차이"].apply(lambda x: f"+{x:,.0f}만원" if x >= 0 else f"{x:,.0f}만원"),
                 textposition="outside",
             ))
             fig_ppy.update_layout(

@@ -46,7 +46,7 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import IsolationForest
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import StandardScaler
 
 
 @dataclass
@@ -91,8 +91,6 @@ class AnomalyTransactionModel:
             "거래월",
         ]
     )
-    categorical_cols: list[str] = field(default_factory=lambda: ["지역코드", "시군구"])
-
     model: Optional[Pipeline] = field(default=None, init=False)
     feature_columns_: Optional[list[str]] = field(default=None, init=False)
     train_rows_: int = field(default=0, init=False)
@@ -100,7 +98,7 @@ class AnomalyTransactionModel:
     @property
     def feature_columns(self) -> list[str]:
         """모델 입력 피처 목록을 반환합니다."""
-        return self.numeric_cols + self.categorical_cols
+        return self.numeric_cols
 
     @staticmethod
     def _clean_numeric(series: pd.Series) -> pd.Series:
@@ -188,11 +186,6 @@ class AnomalyTransactionModel:
         preprocessor = ColumnTransformer(
             transformers=[
                 ("num", StandardScaler(), self.numeric_cols),
-                (
-                    "cat",
-                    OneHotEncoder(handle_unknown="ignore", sparse_output=False),
-                    self.categorical_cols,
-                ),
             ],
             remainder="drop",
             verbose_feature_names_out=False,
@@ -353,10 +346,7 @@ if __name__ == "__main__":
 
     print("\n=== 2. 모델 학습 ===")
     model = AnomalyTransactionModel()
-    
-   # 학습(fit)은 전체 데이터의 패턴을 파악하기에 충분한 20만 개만 무작위로 추출
-    train_df = df.sample(n=min(200000, len(df)), random_state=42)
-    model.fit_from_dataframe(train_df)
+    model.fit_from_dataframe(df)
     print("모델 학습 완료!")
 
     print("\n=== 3. 전체 데이터 이상 거래 탐지 (Batch 처리) ===")
