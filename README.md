@@ -230,18 +230,18 @@ SKN29-2nd-3Team/
 │
 ├── app/                            # Streamlit 웹 애플리케이션
 │   ├── Home.py                     # 메인 대시보드
-│   ├── pages/
-│   │   ├── 1_가격추이분석.py
-│   │   ├── 2_입지분석.py
-│   │   ├── 3_지도시각화.py
-│   │   ├── 4_회귀모델.py
-│   │   ├── 5_분류모델.py
-│   │   ├── 6_군집화.py
-│   │   ├── 7_신경망.py
-│   │   ├── 8_모델분석.py
-│   │   ├── 9_프리미엄분석.py       # 저·고평가 분석
-│   │   └── 10_이상치분석.py
-│   └── components/                 # (공통 UI 컴포넌트 예약)
+│   └── pages/
+│       ├── 0_개요.py               # 프로젝트 개요
+│       ├── 1_가격추이분석.py
+│       ├── 2_지도시각화.py
+│       ├── 3_입지분석.py
+│       ├── 4_프리미엄분석.py       # 저·고평가 분석
+│       ├── 5_이상치분석.py
+│       ├── 6_회귀모델.py
+│       ├── 7_신경망.py
+│       ├── 8_분류모델.py
+│       ├── 9_군집화.py
+│       └── 10_모델분석.py
 │
 ├── models/                         # 머신러닝 모델
 │   ├── base.py                     # 추상 베이스 클래스 (BaseModel)
@@ -270,17 +270,17 @@ SKN29-2nd-3Team/
 │   ├── insert_data.py          # CSV → MySQL 배치 적재 (~500만 건)
 │   ├── build_sigungu_stats.py  # 시군구별 통계 테이블 생성
 │   ├── save_models.py          # 모델 학습 및 pkl 저장 (분류·군집·프리미엄)
+│   ├── save_page_data.py       # 페이지별 사전계산 데이터 캐시 저장
 │   ├── train_dnn.py            # DNN 모델 학습 및 저장
-│   ├── precompute_anomaly.py   # 이상치 결과 사전계산 및 캐시
+│   ├── precompute_anomaly.py   # 이상치 탐지 결과 사전계산 및 캐시
 │   ├── test_classification.py  # 분류 모델 테스트
 │   ├── test_clustering.py      # 군집화 모델 테스트
 │   └── _common.py              # 스크립트 공용 유틸
 │
 ├── data/
-│   ├── raw/                    # 원본 ZIP 파일 (Apart Deal_1~5.zip)
-│   ├── processed/
-│   │   └── Apart Deal_6.csv    # 전처리 완료 통합 데이터 (~500만 건)
-│   ├── cache/                  # 사전계산 캐시 (parquet, json)
+│   ├── raw/                    # 원본 데이터 (Apart Deal_1~5.zip, Apart Deal_6.csv)
+│   ├── processed/              # 전처리 완료 데이터 (Apart Deal_6.zip)
+│   ├── cache/                  # 사전계산 캐시 (parquet, json, pkl)
 │   └── models/                 # 학습된 모델 pkl/pt 저장소
 │       ├── LinearRegression_model.pkl
 │       ├── RandomForest_model.pkl
