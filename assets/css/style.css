@@ -44,9 +44,23 @@ html, body, [class*="css"] {
     border-right: 1px solid #E5EAF2;
 }
 
-[data-testid="stSidebarHeader"] {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
+[data-testid="stSidebarContent"] {
+    display: flex;
+    flex-direction: column;
+}
+
+[data-testid="stSidebarNav"] {
+    order: 2;
+}
+
+[data-testid="stNavSectionHeader"] {
+    font-weight: 700;
+}
+
+[data-testid="stSidebarUserContent"] {
+    order: 1;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
 }
 
 /* 라디오 메뉴 간격 */
@@ -331,9 +345,6 @@ button[kind="primary"]:hover {
 /* =========================================
    10. 사이드바 커스텀 네비게이션
 ========================================= */
-[data-testid="stSidebarNav"] {
-    display: none !important;
-}
 
 [data-testid="stSidebar"] [data-testid="stPageLink"] > a {
     display: block;

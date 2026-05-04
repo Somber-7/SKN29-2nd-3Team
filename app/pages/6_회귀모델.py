@@ -12,18 +12,9 @@ from utils.db import get_connection
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from utils.ui import (
-    load_css, render_sidebar, page_header,
+    page_header,
     section_badge,
 )
-
-
-# =============================================================================
-# 기본 설정
-# =============================================================================
-
-st.set_page_config(page_title="회귀 모델", layout="wide")
-load_css()
-render_sidebar()
 
 st.markdown("""
 <style>

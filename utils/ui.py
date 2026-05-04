@@ -15,7 +15,7 @@ def load_css():
 
 
 def render_sidebar():
-    """모든 페이지 공통 사이드바 — 로고 + 커스텀 네비게이션"""
+    """사이드바 로고 — st.navigation() 방식에서 메뉴는 Streamlit이 자동 렌더링"""
     st.sidebar.markdown("""
     <div style="padding: 8px 0 16px 0;">
         <div style="font-size:35px; font-weight:800; color:#172B4D;">🏢 부동산 분석</div>
@@ -23,19 +23,6 @@ def render_sidebar():
     </div>
     """, unsafe_allow_html=True)
     st.sidebar.divider()
-
-    with st.sidebar:
-        st.page_link("Home.py",                 label="🏠  개요")
-        st.page_link("pages/1_가격추이분석.py", label="📈  가격 추이 분석")
-        st.page_link("pages/2_입지분석.py",     label="📍  입지 분석")
-        st.page_link("pages/3_지도시각화.py",   label="🗺️  지도 시각화")
-        st.page_link("pages/4_회귀모델.py",     label="📊  회귀 모델")
-        st.page_link("pages/5_분류모델.py",     label="🏷️  분류 모델")
-        st.page_link("pages/6_군집화.py",       label="🔵  군집화")
-        st.page_link("pages/7_신경망.py",       label="🧠  신경망 (DNN)")
-        st.page_link("pages/8_모델분석.py",     label="📋  모델 분석")
-        st.page_link("pages/9_프리미엄분석.py", label="💡  저·고평가 분석")
-        st.page_link("pages/10_이상치분석.py", label="🔴  이상치 분석")
 
 
 def page_header(title: str):

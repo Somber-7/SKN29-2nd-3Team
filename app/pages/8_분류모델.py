@@ -10,14 +10,10 @@ import plotly.figure_factory as ff
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from utils.ui import (
-    load_css, render_sidebar, page_header,
+    page_header,
     section_badge, stat_card,
 )
 from utils.db import fetch_all
-
-st.set_page_config(page_title="분류 모델", layout="wide")
-load_css()
-render_sidebar()
 
 page_header("분류 모델 — 브랜드 등급 분류")
 

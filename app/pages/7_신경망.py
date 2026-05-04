@@ -9,14 +9,9 @@ import plotly.graph_objects as go
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from utils.ui import (
-    load_css, render_sidebar, page_header,
+    page_header,
     section_badge, stat_card,
 )
-from utils.db import load_apart_deals
-
-st.set_page_config(page_title="신경망 (DNN)", layout="wide")
-load_css()
-render_sidebar()
 
 page_header("신경망 — DNN 거래금액 예측 (PyTorch)")
 

@@ -8,11 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from utils.ui import load_css, render_sidebar, page_header, section_badge
-
-st.set_page_config(page_title="가격 추이 분석", layout="wide")
-load_css()
-render_sidebar()
+from utils.ui import page_header, section_badge
 
 page_header("가격 추이 분석")
 
