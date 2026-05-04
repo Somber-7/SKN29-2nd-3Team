@@ -574,7 +574,9 @@ class XGBoostPriceModel(ApartmentPriceRegressionBase):
             raise ModuleNotFoundError(
                 "XGBoostPriceModel을 사용하려면 `pip install xgboost`가 필요합니다."
             ) from exc
-        return XGBRegressor(**self.estimator_params)
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        return XGBRegressor(device=device, **self.estimator_params)
     
     def get_feature_importance(self):
         import pandas as pd

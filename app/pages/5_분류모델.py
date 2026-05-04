@@ -72,10 +72,10 @@ classes  = model.classes_ or GRADE_LABELS
 # ── 성능 지표
 section_badge("📊", "모델 성능 지표")
 mc1, mc2, mc3, mc4 = st.columns(4)
-mc1.markdown(stat_card(f"{metrics.get('Accuracy',  0):.3f}", "Accuracy"),  unsafe_allow_html=True)
-mc2.markdown(stat_card(f"{metrics.get('Precision', 0):.3f}", "Precision"), unsafe_allow_html=True)
-mc3.markdown(stat_card(f"{metrics.get('Recall',    0):.3f}", "Recall"),    unsafe_allow_html=True)
-mc4.markdown(stat_card(f"{metrics.get('F1',        0):.3f}", "F1-Score"),  unsafe_allow_html=True)
+mc1.markdown(stat_card(f"{metrics.get('Accuracy',  0):.4f}", "Accuracy"),  unsafe_allow_html=True)
+mc2.markdown(stat_card(f"{metrics.get('Precision', 0):.4f}", "Precision"), unsafe_allow_html=True)
+mc3.markdown(stat_card(f"{metrics.get('Recall',    0):.4f}", "Recall"),    unsafe_allow_html=True)
+mc4.markdown(stat_card(f"{metrics.get('F1',        0):.4f}", "F1-Score"),  unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
