@@ -9,6 +9,7 @@ from utils.ui import load_css
 
 st.set_page_config(
     page_title="부동산 분석 플랫폼",
+    page_icon="🏢",
     layout="wide",
     initial_sidebar_state="expanded",
 )
