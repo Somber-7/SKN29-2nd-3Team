@@ -11,15 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from utils.ui import load_css, render_sidebar, page_header, section_badge
-
-# =============================================================================
-# 기본 설정
-# =============================================================================
-
-st.set_page_config(page_title="이상치 분석", layout="wide")
-load_css()
-render_sidebar()
+from utils.ui import page_header, section_badge
 
 st.markdown("""
 <style>

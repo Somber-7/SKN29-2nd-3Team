@@ -10,13 +10,9 @@ import plotly.graph_objects as go
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from utils.ui import (
-    load_css, render_sidebar, page_header,
-    section_badge, chart_card_open, chart_card_close, stat_card,
+    page_header,
+    section_badge, stat_card,
 )
-
-st.set_page_config(page_title="모델 분석", layout="wide")
-load_css()
-render_sidebar()
 
 page_header("모델 분석 — 회귀 / 분류 / 군집화")
 
@@ -66,14 +62,12 @@ with tab_reg:
             return ["background-color:#EFF6FF; font-weight:bold"] * len(row)
         return [""] * len(row)
 
-    chart_card_open()
     st.dataframe(
         REG_DATA.style.apply(highlight_best_reg, axis=1).format(
             {"MAE": "{:,}", "RMSE": "{:,}", "R²": "{:.4f}"}, na_rep="-"
         ),
         use_container_width=True, hide_index=True,
     )
-    chart_card_close()
 
     st.markdown("<br>", unsafe_allow_html=True)
     section_badge("📈", "시각화 비교", color="#F97316")
@@ -83,7 +77,6 @@ with tab_reg:
     colors = ["#BFDBFE", "#93C5FD", "#60A5FA", "#3B82F6", "#1D4ED8"][:n_models]
 
     with ch1:
-        chart_card_open()
         fig = go.Figure(go.Bar(
             x=REG_DATA["R²"], y=REG_DATA["모델"],
             orientation="h", marker_color=colors,
@@ -98,10 +91,8 @@ with tab_reg:
             yaxis=dict(autorange="reversed"),
         )
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
 
     with ch2:
-        chart_card_open()
         mae_vals  = pd.to_numeric(REG_DATA["MAE"],  errors="coerce")
         rmse_vals = pd.to_numeric(REG_DATA["RMSE"], errors="coerce")
         fig = go.Figure()
@@ -114,7 +105,6 @@ with tab_reg:
             yaxis=dict(showgrid=True, gridcolor="#F0F4F8", tickformat=","),
         )
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
 
 # ══════════════════════════════════════════════════════
 # 분류 탭
@@ -143,7 +133,6 @@ with tab_cls:
 
     ch1, ch2 = st.columns(2)
     with ch1:
-        chart_card_open()
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=TUNE_STEPS, y=TUNE_ACC,
@@ -175,10 +164,8 @@ with tab_cls:
             legend=dict(orientation="h", y=1.15),
         )
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
 
     with ch2:
-        chart_card_open()
         # 일반브랜드 F1 개선 (데이터 있는 단계만)
         brand_steps = ["초기 모델", "3단계\n키워드 보강", "4단계\n하이퍼파라미터", "5단계\nEarly Stopping"]
         brand_vals  = [0.396,       0.632,               0.855,               0.930]
@@ -196,7 +183,6 @@ with tab_cls:
             xaxis=dict(showgrid=False),
         )
         st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
 
     st.divider()
 
@@ -212,17 +198,14 @@ with tab_cls:
     ])
 
     with ch1:
-        chart_card_open()
         st.dataframe(
             CLASS_DATA.style.format({
                 "Precision": "{:.3f}", "Recall": "{:.3f}", "F1": "{:.3f}", "Support": "{:,}"
             }),
             use_container_width=True, hide_index=True,
         )
-        chart_card_close()
 
     with ch2:
-        chart_card_open()
         cls_colors = ["#93C5FD", "#60A5FA", "#3B82F6", "#1D4ED8"]
         fig3 = go.Figure()
         for metric, color in zip(["Precision", "Recall", "F1"], ["#3B82F6", "#10B981", "#8B5CF6"]):
@@ -241,7 +224,6 @@ with tab_cls:
             legend=dict(orientation="h", y=1.15),
         )
         st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
 
     st.divider()
 
@@ -285,7 +267,6 @@ with tab_clust:
     ch1, ch2 = st.columns(2)
 
     with ch1:
-        chart_card_open()
         phase1_labels = ["#1 원본 7개", "#3 4개+가중치", "#10 +거래활성도"]
         phase1_vals   = [0.177, 0.262, 0.362]
         phase2_labels = ["MiniBatch\n최종", "GPU ×3", "GPU ×5\n(최종)", "GPU ×7", "GPU ×10"]
@@ -315,10 +296,8 @@ with tab_clust:
             legend=dict(orientation="h", y=1.15),
         )
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
 
     with ch2:
-        chart_card_open()
         k_vals   = [5, 6, 7, 8, 9]
         k_sil    = [0.5100, 0.4321, 0.4694, 0.4671, 0.2935]
         colors_k = ["#93C5FD", "#60A5FA", "#1D4ED8", "#60A5FA", "#93C5FD"]
@@ -337,7 +316,6 @@ with tab_clust:
             xaxis=dict(showgrid=False),
         )
         st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
 
     st.divider()
     section_badge("🗺️", "최종 군집 해석 (k=7)", color="#345BCB")
@@ -354,15 +332,12 @@ with tab_clust:
 
     cl1, cl2 = st.columns(2)
     with cl1:
-        chart_card_open()
         st.dataframe(
             CLUSTER_DATA.style.format({"거래건수": "{:,}", "평균평당가(만원)": "{:,}"}),
             use_container_width=True, hide_index=True,
         )
-        chart_card_close()
 
     with cl2:
-        chart_card_open()
         cluster_colors = ["#60A5FA","#93C5FD","#3B82F6","#2563EB","#1D4ED8","#1E40AF","#BFDBFE"]
         fig3 = go.Figure(go.Bar(
             x=CLUSTER_DATA["권역 해석"],
@@ -379,7 +354,6 @@ with tab_clust:
             yaxis=dict(showgrid=True, gridcolor="#F0F4F8", tickformat=","),
         )
         st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
-        chart_card_close()
 
     st.divider()
     section_badge("💡", "k=5 vs k=7 선택 근거", color="#8B5CF6")

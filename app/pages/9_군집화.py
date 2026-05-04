@@ -10,13 +10,9 @@ import streamlit.components.v1 as components
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from utils.ui import (
-    load_css, render_sidebar, page_header,
+    page_header,
     section_badge, stat_card,
 )
-
-st.set_page_config(page_title="군집화", layout="wide")
-load_css()
-render_sidebar()
 
 page_header("군집화 — 지역 군집 분석")
 

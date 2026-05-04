@@ -9,14 +9,9 @@ import plotly.graph_objects as go
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from utils.ui import (
-    load_css, render_sidebar, page_header,
-    section_badge, stat_card, chart_card_open, chart_card_close,
+    page_header,
+    section_badge, stat_card,
 )
-from utils.db import load_apart_deals
-
-st.set_page_config(page_title="신경망 (DNN)", layout="wide")
-load_css()
-render_sidebar()
 
 page_header("신경망 — DNN 거래금액 예측 (PyTorch)")
 
@@ -39,7 +34,6 @@ if os.path.exists(META_PATH):
     mc3.markdown(stat_card(f"{meta['metrics']['R2']:.4f}",        "R²",       ""),                                   unsafe_allow_html=True)
     mc4.markdown(stat_card(f"{meta['elapsed']:.0f}초",            "학습 시간", f"샘플 {meta['sample_size']:,}건"),   unsafe_allow_html=True)
 
-    chart_card_open()
     x = list(range(1, len(meta["train_losses"]) + 1))
     fig0 = go.Figure()
     fig0.add_trace(go.Scatter(x=x, y=meta["train_losses"], mode="lines",
@@ -57,7 +51,6 @@ if os.path.exists(META_PATH):
         legend=dict(orientation="h", y=1.05),
     )
     st.plotly_chart(fig0, use_container_width=True)
-    chart_card_close()
 
     st.divider()
 
