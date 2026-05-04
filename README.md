@@ -22,10 +22,9 @@
 
 ## 프로젝트 구성원 및 역할
 | 김정민 | 윤승혁 | 이지현 | 임준 |
-|---|---|---|---|
-|![image](./docs/image/profile_image/jeong_min.webp)|![image](./docs/image/profile_image/seung_hyuk.webp)|![image](./docs/image/profile_image/ji_hyun.webp)|![image](./docs/image/profile_image/jun.webp)|
-|[@min1i](https://github.com/min1i)|[@idenist](https://github.com/idenist)|[@qkfmadl0-create](https://github.com/qkfmadl0-create)|[@Somber-7](https://github.com/Somber-7)|
-
+| :---: | :---: | :---: | :---: |
+| <img src="./docs/image/profile_image/jeong_min.webp" width="150"> | <img src="./docs/image/profile_image/seung_hyuk.webp" width="150"> | <img src="./docs/image/profile_image/ji_hyun.webp" width="150"> | <img src="./docs/image/profile_image/jun.webp" width="150"> |
+| [@min1i](https://github.com/min1i) | [@idenist](https://github.com/idenist) | [@qkfmadl0-create](https://github.com/qkfmadl0-create) | [@Somber-7](https://github.com/Somber-7) |
 <br/>
 
 ## 프로젝트 배경 및 필요성
@@ -93,7 +92,7 @@
 | `저·고평가 분석` | 입지·브랜드 가치 대비 저평가/고평가 매물 분석 |
 | `이상치 분석` | Isolation Forest 기반 특이 거래 탐지 |
 
-*※ 메인기능 시각화 화면은 최하단을 참고해주세요*
+> 메인기능 시각화 화면은 최하단을 참고해주세요.
 
 
 <br/>
@@ -125,6 +124,12 @@ Streamlit 페이지 (즉시 로드)
 ## 데이터 전처리
 
 원본 데이터(Kaggle - Korean Real Estate Transaction Data, 5,002,839건)는 총 **5단계 CSV 전처리**와 **ML 파이프라인 전처리**를 거쳐 모델 학습에 투입됩니다.
+
+> Reference <br>
+- [Kaggle: Korean Apartment Deal Data](https://www.kaggle.com/datasets/brainer3220/korean-real-estate-transaction-data/data)
+- [서울 열린 데이터 광장: 서울시 부동산 실거래가 정보](https://data.seoul.go.kr/dataList/OA-21275/S/1/datasetView.do)
+- [한국은행: 기준 금리 추이](https://www.bok.or.kr/portal/singl/baseRate/list.do?dataSeCd=01&menuNo=200643)
+- [ECOS 한국은행 경제통계시스템: 경제지표 데이터](https://ecos.bok.or.kr/#/SearchStat)
 
 <br/>
 
@@ -373,3 +378,22 @@ streamlit run Home.py
 |---|---|
 ### 4️⃣모델 성능 리포트
 ![image](./docs/image/모델비교분석.png)
+
+<br/>
+<br/>
+
+## 팀원 한줄 회고
+**1. 김정민** : 완벽한 데이터셋을 가지고 시작한 것이 아니라서 팀원 모두에게 이번 프로젝트 주제가 도전에 가까웠는데요. 부족한 데이터셋에 필요한 파생 변수들을 점차 추가해가며 모델을 구축하고 유의미한 결과까지 도출해낼 수 있어 뜻깊은 경험이었습니다.
+
+<br>
+
+**2. 윤승혁** : 피처를 추가할수록 성능이 향상되는 것을 확인할 수 있었고, 하나의 데이터셋으로 회귀, 분류, 군집화 등 다양한 관점에서 분석을 해본 것이 의미가 있었다고 
+생각합니다. 
+
+<br>
+
+**3. 이지현** : 세대수 전처리부터 시작해 Isolation Forest 모델링, 그리고 이를 시각화할 프론트엔드와 PPT 구성까지 전체 파이프라인을 경험하며 데이터가 가치 있는 정보로 변하는 과정을 실감할 수 있었습니다.
+
+<br>
+
+**4. 임준** : 기존 부족했던 데이터에서 전처리와 파생 변수를 통해 모델의 학습 성능을 향상시키고, 여러가지 모델을 직접 사용하고 튜닝하는 과정에서 많은 것을 배우는 시간이었습니다.
