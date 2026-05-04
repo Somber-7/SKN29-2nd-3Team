@@ -308,27 +308,6 @@ with tab2:
 
         x_gu = "구명" if "구명" in summary_s.columns else summary_s.columns[0]
 
-        # ── 구별 특이거래 비율 바차트
-        section_badge("🏙️", "구별 특이거래 비율 비교", color="#7C3AED")
-        summary_s_sorted = summary_s.sort_values("특이거래비율(%)", ascending=False)
-        fig_gu = go.Figure(go.Bar(
-            x=summary_s_sorted[x_gu],
-            y=summary_s_sorted["특이거래비율(%)"],
-            marker_color="#8B5CF6",
-            text=summary_s_sorted["특이거래비율(%)"].apply(lambda x: f"{x:.2f}%"),
-            textposition="outside",
-        ))
-        fig_gu.update_layout(
-            height=400,
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(t=30, b=80, l=20, r=20),
-            yaxis=dict(title="특이거래 비율 (%)", showgrid=True, gridcolor="#F0F4F8"),
-            xaxis=dict(tickangle=-45),
-        )
-        st.plotly_chart(fig_gu, use_container_width=True, config={"displayModeBar": False})
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
         # ── 구별 평당가 차이 바차트
         section_badge("💰", "구별 정상거래 vs 특이거래 평당가 차이", color="#059669")
         if "평균평당가_차이" in summary_s.columns:
