@@ -208,7 +208,7 @@ if "위도" in feature_cols and "경도" in feature_cols:
         <meta charset="utf-8">
         <style>
             body {{ margin: 0; padding: 0; }}
-            #map {{ width: 100%; height: 480px; }}
+            #map {{ width: 100%; height: 620px; }}
         </style>
     </head>
     <body>
@@ -229,9 +229,7 @@ if "위도" in feature_cols and "경도" in feature_cols:
     </html>
     """
 
-    _, map_col, _ = st.columns([1, 3, 1])
-    with map_col:
-        components.html(kakao_html, height=500)
+    components.html(kakao_html, height=640)
     st.markdown("<br>", unsafe_allow_html=True)
 
 # ── 군집별 피처 평균

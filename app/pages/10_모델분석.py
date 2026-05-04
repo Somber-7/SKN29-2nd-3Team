@@ -157,11 +157,11 @@ with tab_cls:
                       annotation_text="최종 0.960")
         fig.update_layout(
             title="Accuracy / F1 튜닝 과정",
-            height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=40, b=0),
+            height=340, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=0, t=70, b=0),
             yaxis=dict(range=[0.7, 1.02], showgrid=True, gridcolor="#F0F4F8"),
             xaxis=dict(showgrid=False),
-            legend=dict(orientation="h", y=1.15),
+            legend=dict(orientation="h", y=1.25, x=0.5, xanchor="center"),
         )
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
@@ -218,10 +218,10 @@ with tab_cls:
         fig3.update_layout(
             title="클래스별 Precision / Recall / F1",
             barmode="group",
-            height=300, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=40, b=0),
+            height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=0, t=70, b=0),
             yaxis=dict(range=[0.85, 1.02], showgrid=True, gridcolor="#F0F4F8"),
-            legend=dict(orientation="h", y=1.15),
+            legend=dict(orientation="h", y=1.25, x=0.5, xanchor="center"),
         )
         st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
 
