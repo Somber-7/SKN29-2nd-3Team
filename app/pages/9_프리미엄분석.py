@@ -3,6 +3,7 @@
 import streamlit as st
 import sys
 import os
+import joblib
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -10,9 +11,6 @@ import plotly.graph_objects as go
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from utils.ui import load_css, render_sidebar, page_header, section_badge
-from utils.db import load_apart_deals
-from models.regression.price_regression_models import XGBoostPriceModel
-from models.regression.price_premium_analyzer import PricePremiumAnalyzer
 
 
 # =============================================================================
@@ -73,7 +71,8 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+PROJECT_ROOT  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+RESULTS_PATH  = os.path.join(PROJECT_ROOT, "data", "models", "premium_analysis_results.pkl")
 
 GRADE_ORDER  = ["큰 할인", "할인", "보통", "프리미엄", "고프리미엄"]
 GRADE_COLORS = {
@@ -92,66 +91,26 @@ GROUP_COLS = [
 
 
 # =============================================================================
-# 데이터 & 분석 (캐시 — 최초 1회만 실행)
+# 분석 결과 로드 (사전 계산된 pkl)
 # =============================================================================
 
-@st.cache_data(show_spinner="데이터 로딩 중...")
-def load_data():
-    return load_apart_deals()
+@st.cache_resource
+def load_results():
+    if not os.path.exists(RESULTS_PATH):
+        st.error(
+            "분석 결과 파일이 없습니다. 아래 명령어를 먼저 실행해주세요.\n\n"
+            "```\npython scripts/save_models.py\n```"
+        )
+        st.stop()
+    return joblib.load(RESULTS_PATH)
 
 
-@st.cache_data(show_spinner="적정가 모델 학습 및 프리미엄 분석 중... (최초 1회, 약 1~2분 소요)")
-def run_analysis():
-    df = load_data()
-
-    # 역세권·학세권·브랜드를 프리미엄 분석 대상으로 보기 위해 모델 피처에서 제외
-    # → 모델이 이 요소들을 모르는 상태에서 적정가를 계산 → 잔차가 해당 요소의 순수 프리미엄을 반영
-    PREMIUM_NUMERIC_COLS = [
-        "전용면적", "층", "건물연식", "기준금리", "세대수", "거래연도", "거래월",
-    ]
-    price_model = XGBoostPriceModel(
-        sample_size=200_000,
-        random_state=42,
-        numeric_cols=PREMIUM_NUMERIC_COLS,
-    )
-    price_model.fit_from_dataframe(df)
-
-    analyzer = PricePremiumAnalyzer(price_model=price_model)
-    premium_df = analyzer.analyze(df)
-
-    metrics = analyzer.evaluate_price_model(premium_df)
-
-    # 시군구 요약
-    sigungu_df = analyzer.summarize_by_group(premium_df, "시군구", min_count=500)
-
-    # 이진 그룹 요약
-    group_summaries = {}
-    for col, _, _ in GROUP_COLS:
-        if col in premium_df.columns:
-            s = analyzer.summarize_by_group(premium_df, col, min_count=100)
-            if len(s) >= 2:
-                group_summaries[col] = s
-
-    # 프리미엄 등급 분포
-    grade_counts = {
-        g: int((premium_df["프리미엄등급"] == g).sum())
-        for g in GRADE_ORDER
-    }
-
-    # 산점도용 샘플 (메모리 절약)
-    scatter_cols = ["거래금액", "예측거래금액", "프리미엄률"]
-    if "시군구" in premium_df.columns:
-        scatter_cols.append("시군구")
-    scatter_sample = (
-        premium_df[scatter_cols]
-        .sample(min(4000, len(premium_df)), random_state=42)
-        .reset_index(drop=True)
-    )
-
-    return metrics, sigungu_df, group_summaries, grade_counts, scatter_sample
-
-
-metrics, sigungu_df, group_summaries, grade_counts, scatter_sample = run_analysis()
+results       = load_results()
+metrics       = results["metrics"]
+sigungu_df    = results["sigungu_df"]
+group_summaries = results["group_summaries"]
+grade_counts  = results["grade_counts"]
+scatter_sample = results["scatter_sample"]
 
 
 # =============================================================================
