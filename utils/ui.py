@@ -33,7 +33,7 @@ def render_sidebar():
         st.page_link("pages/5_분류모델.py",     label="🏷️  분류 모델")
         st.page_link("pages/6_군집화.py",       label="🔵  군집화")
         st.page_link("pages/7_신경망.py",       label="🧠  신경망 (DNN)")
-        st.page_link("pages/8_모델비교.py",     label="📋  모델 비교")
+        st.page_link("pages/8_모델분석.py",     label="📋  모델 분석")
         st.page_link("pages/9_프리미엄분석.py", label="💡  저·고평가 분석")
         st.page_link("pages/10_이상치분석.py", label="🔴  이상치 분석")
 

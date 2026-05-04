@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(cd /d \"d:\\\\Project\\\\SKN29-2nd-3Team\")",
-      "Bash(python -c \"import streamlit_folium; print\\(streamlit_folium.__version__\\)\")",
-      "Bash(python -c ' *)"
-    ]
-  }
-}
