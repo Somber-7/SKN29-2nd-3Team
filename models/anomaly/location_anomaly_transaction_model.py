@@ -5,7 +5,7 @@
 각 시군구 내부 거래 패턴 기준의 특이 거래를 탐지합니다.
 
 사용 예시
----------
+--------- 
 import pandas as pd
 from models.anomaly.location_anomaly_transaction_model import LocationAnomalyModel
 

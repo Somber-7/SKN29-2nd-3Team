@@ -21,7 +21,7 @@
     location_summary.parquet        시군구별 요약 테이블
     location_anomalies.parquet      전국 특이거래 전체 (시군구 선택 조회용)
 """
-
+ 
 import json
 import sys
 import time

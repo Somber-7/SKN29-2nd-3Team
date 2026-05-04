@@ -543,3 +543,4 @@ with tab3:
         st.dataframe(display_summary_l, use_container_width=True, height=500)
 
         st.markdown("<br>", unsafe_allow_html=True)
+ 
